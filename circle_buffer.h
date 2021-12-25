@@ -19,7 +19,10 @@
 #include <cstddef>
 #include <functional>
 #include <iterator>
+#include <new>
 #include <utility>
+
+
 #pragma endregion
 
 
@@ -29,21 +32,28 @@ template <std::copyable T>
 	TODO(Equationzhao):
 		* Add concept Support
 		* Add constexpr support
+		* Add user-defined comparator support
 		* Use placement new instead of operator new
 		? Module support
 		? allocator support
 		? ranges support
-		
 */
 class CircleBuffer
 {
 private:
+	/**
+	 * @brief Node
+	 *		contains the data
+	 *		contains the last and next Node*
+	 */
 	class Node
 	{
 	public:
+#pragma region data and pointer
 		T data{};
 		Node* next{nullptr};
 		Node* prev{nullptr};
+#pragma endregion
 
 #pragma region Constructors && Destructor
 
@@ -66,47 +76,87 @@ private:
 
 #pragma endregion
 
-		auto write(const T& data)
+#pragma region Modifiers
+		/*
+		 * @brief write data 
+		 */
+		auto write(const T& dataToWrite)
 		{
-			this->data = data;
+			this->data = dataToWrite;
 		}
 
-		auto write(T&& data)
+		/*
+		 * @brief write data
+		 */
+		auto write(T&& dataToWrite)
 		{
-			this->data = std::move(data);
+			this->data = std::move(dataToWrite);
 		}
 
-		auto read()
+		/*
+		 * @brief get a copy of the data
+		 * @return value
+		 */
+		[[nodiscard]] auto read() const
 		{
 			return this->data;
 		}
+
+
+		/**
+		 * @brief  get Reference of the data
+		 * @return reference
+		 */
+		[[nodiscard]] T& get()
+		{
+			return this->data;
+		}
+
+		/**
+		 * @brief  get Reference of the data
+		 * @return reference
+		 */
+		[[nodiscard]] T& get() const
+		{
+			return this->data;
+		}
+
+
+		/**
+		 * @brief  get const-reference of the data
+		 * @return  const reference
+		 */
+		[[nodiscard]] const T& const_get() const
+		{
+			return this->data;
+		}
+
+#pragma endregion
 	};
 
 	Node* buffer;
 	size_t capacity_{0};
 	size_t size_{0};
-	size_t head_{0};
-	size_t tail_{0};
 
 	/**
 	 * @brief initialize the circular buffer
 	 *
-	 * @param capacity_ the capacity of the buffer
+	 * @param capacityToInit the capacity of the buffer
 	 */
-	void init(size_t capacity_)
+	void init(size_t capacityToInit)
 	{
-		this->capacity_ = capacity_;
+		this->capacity_ = capacityToInit;
 		this->size_ = 0;
-		this->head_ = 0;
-		this->tail_ = 0;
+
 
 #pragma region initialize buffer
 		// create buffer
 		buffer = new Node();
 		Node* iterator_ = buffer;
 
+
 		// create nodes and link them
-		for (size_t i = 0; i < capacity_ - 1; ++i)
+		for (size_t i = 0; i < capacityToInit - 1; ++i)
 		{
 			iterator_->next = new Node();
 			iterator_->next->prev = iterator_;
@@ -175,34 +225,160 @@ private:
 		}
 	}
 
-	auto getSize_() const
+#pragma region getters
+
+	[[nodiscard]] auto getSize_() const
 	{
 		return size_;
 	}
 
-	auto getCapacity_() const
+	[[nodiscard]] auto getCapacity_() const
 	{
 		return capacity_;
 	}
 
-	auto getHead_() const
+	[[nodiscard]] auto getHead_()
 	{
-		return head_;
+		return buffer->get();
 	}
 
-	auto getTail_() const
+	[[nodiscard]] auto getTail_()
 	{
-		return tail_;
+		return buffer->prev->get();
 	}
+
+	[[nodiscard]] auto getHead_() const
+	{
+		return buffer->const_get();
+	}
+
+	[[nodiscard]] auto getTail_() const
+	{
+		return buffer->prev->const_get();
+	}
+
+	[[nodiscard]] auto getPtrHead_()
+	{
+		return &buffer->data;
+	}
+
+	[[nodiscard]] auto getPtrTail_()
+	{
+		return &buffer->prev->data;
+	}
+
+#pragma endregion
 
 public:
-	// TODO(Equationzhao) impl the iterator
-	// class iterator
+	// TODO(Equationzhao) implements the iterator
+	class iterator
+	{
+		using iterator_category = std::bidirectional_iterator_tag;
+		using value_type = Node;
+		using difference_type = ptrdiff_t;
+		using pointer = T*;
+		using reference = T&;
+		using self = iterator;
+		using const_pointer = const value_type*;
+		using const_reference = const value_type&;
+	private:
+		value_type* ptr_;
+
+	public:
+		iterator() : ptr_(nullptr)
+		{
+		}
+
+		explicit iterator(value_type* ptr) : ptr_(ptr)
+		{
+		}
+
+		iterator(const iterator& other) : ptr_(other.ptr_)
+		{
+		}
+
+		iterator(iterator&& other) noexcept : ptr_(other.ptr_)
+		{
+		}
+
+		iterator& operator =(const iterator& other)
+		{
+			if (this == &other)
+			{
+				return *this;
+			}
+			ptr_ = other.ptr_;
+			return *this;
+		}
+
+		iterator& operator =(iterator&& other) noexcept
+		{
+			ptr_ = other.ptr_;
+			return *this;
+		}
+
+		bool operator==(const iterator& other) const
+		{
+			return ptr_ == other.ptr_;
+		}
+
+		reference operator*()
+		{
+			return ptr_->get();
+		}
+
+		reference operator*() const
+		{
+			return ptr_->const_get();
+		}
+
+		pointer operator->() const
+		{
+			return &ptr_->data;
+		}
+
+		self& operator++()
+		{
+			ptr_ = ptr_->next;
+			return *this;
+		}
+
+		self operator++(int)
+		{
+			self tmp = *this;
+			++(*this);
+			return tmp;
+		}
+
+		self& operator--()
+		{
+			ptr_ = ptr_->prev;
+			return *this;
+		}
+
+		self operator--(int)
+		{
+			self tmp = *this;
+			--(*this);
+			return tmp;
+		}
+	};
+
+
+#pragma region Constructor && Descructor
 
 	explicit CircleBuffer(size_t capacity_)
 	{
 		init(capacity_);
 	}
+
+	// TODO(Equationzhao) Support user-defined deleter
+	virtual ~CircleBuffer()
+	{
+		destroy();
+	}
+
+#pragma endregion
 
 #pragma region deleted functions
 	/*
@@ -220,40 +396,156 @@ public:
 
 #pragma endregion
 
-#pragma region
+#pragma region element access
+
+	[[nodiscard]] T& front()
+	{
+		return buffer->get();
+	}
+
+	[[nodiscard]] T& front() const
+	{
+		return buffer->const_get();
+	}
+
+	[[nodiscard]] T& cfront() const
+	{
+		return buffer->const_get();
+	}
+
+	[[nodiscard]] T& back()
+	{
+		return buffer->prev->get();
+	}
+
+	[[nodiscard]] T& back() const
+	{
+		return buffer->prev->const_get();
+	}
+
+	[[nodiscard]] T& cback() const
+	{
+		return buffer->prev->const_get();
+	}
+
+#pragma endregion
+
+#pragma region Modifiers
 	// TODO(Equationzhao) implementation details
 	auto write()
 	{
+		// not Implement yet
+	}
+
+	auto insert()
+	{
+		// not Implement yet
+	}
+
+	auto emplace()
+	{
+		// not Implement yet
 	}
 
 	auto read()
 	{
+		// not Implement yet
 	}
 
 	auto clear()
 	{
+		// not Implement yet
 	}
 
 	auto sort()
 	{
+		// not Implement yet
 	}
-
 
 	auto swap()
 	{
+		// not Implement yet
 	}
 
 	auto erase()
 	{
+		// not Implement yet
 	}
 
 	auto erase_if()
 	{
+		// not Implement yet
 	}
 
+
+#pragma endregion
+
+#pragma region iterator
+
+	/*
+	 * @brief
+		? Since it's a circle, the begin and the end is actually the same element.
+	 *
+	 */
+
+
+	[[nodiscard]] iterator begin()
+	{
+		return iterator(buffer);
+	}
+
+	[[nodiscard]] iterator end()
+	{
+		return iterator(buffer);
+	}
+
+	using const_iterator = iterator;
+
+	[[nodiscard]] const_iterator cbegin() const
+	{
+		return const_iterator(buffer);
+	}
+
+	[[nodiscard]] const_iterator cend() const
+	{
+		return const_iterator(buffer);
+	}
+
+#pragma endregion
+
+#pragma region compare
 	[[nodiscard]] bool operator<=>(const CircleBuffer&) const
 	{
+		// not Implement yet
 	}
+
+	[[nodiscard]] bool operator==(const CircleBuffer& rhs) const
+	{
+		if (this->size() != rhs.size())
+		{
+			return false;
+		}
+		else
+		{
+			bool flag{true};
+
+
+			// ? refactor
+			for (size_t i = 0; i <= size; ++i)
+			{
+				if (this->begin() + i != rhs.begin() + i)
+				{
+					flag = false;
+					break;
+				}
+			}
+
+			return flag;
+		}
+	}
+#pragma endregion
+
+#pragma region Capacity
 
 	[[nodiscard]] size_t size() const
 	{
@@ -269,15 +561,9 @@ public:
 	{
 		return size == 0;
 	}
-#pragma endregion
-
-
-	// TODO(Equationzhao) Support user-defined deleter
-	virtual ~CircleBuffer()
-	{
-		destroy();
-	}
 };
+
+#pragma endregion
 
 
 #endif // !CIRCLE_BUFFER
