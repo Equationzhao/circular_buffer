@@ -15,47 +15,63 @@
 
 #pragma region Includes
 
-
-
+#include <concepts>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <utility>
 #pragma endregion
 
 
-
 // template<typename T, class Allocator = std::allocator<T>>
-template<typename T>
+template <std::copyable T>
 /*
-    TODO(Equationzhao):
-        Add concept support AND allocator support
-        Add constexpr support
+	TODO(Equationzhao):
+		* Add concept Support
+		* Add constexpr support
+		* Use placement new instead of operator new
+		? Module support
+		? allocator support
+		? ranges support
+		
 */
 class CircleBuffer
 {
 private:
-
 	class Node
 	{
 	public:
-		T data;
-		Node *next{nullptr};
-		Node *prev{nullptr};
+		T data{};
+		Node* next{nullptr};
+		Node* prev{nullptr};
 
-		#pragma region Constructors && Destructor
+#pragma region Constructors && Destructor
 
-		explicit Node(const T &data) : data(data) {}
-		explicit Node(T &&data) : data(std::move(data)) {}
-		Node() {}
-		Node(const Node &data) = delete;
-		Node(const Node &&data) = delete;
-		virtual ~Node() {}
+		explicit Node(const T& data) : data(data)
+		{
+		}
 
-		#pragma endregion
+		explicit Node(T&& data) : data(std::move(data))
+		{
+		}
 
-		auto write(const T &data)
+		Node() = default;
+
+		Node(const Node& data) = delete;
+		Node(const Node&& data) = delete;
+		auto operator=(const Node& data) = delete;
+		auto operator=(Node&& data) = delete;
+
+		virtual ~Node() = default;
+
+#pragma endregion
+
+		auto write(const T& data)
 		{
 			this->data = data;
 		}
 
-		auto write(T &&data)
+		auto write(T&& data)
 		{
 			this->data = std::move(data);
 		}
@@ -64,13 +80,10 @@ private:
 		{
 			return this->data;
 		}
-
-		// Node(const T &data, Node *next, Node *prev) : data(data), next(next), prev(prev) {}
-		// Node(T &&data, Node *next, Node *prev) : data(std::move(data)), next(next), prev(prev) {}
 	};
 
-	Node *buffer;
-	size_t capacity_;
+	Node* buffer;
+	size_t capacity_{0};
 	size_t size_{0};
 	size_t head_{0};
 	size_t tail_{0};
@@ -87,10 +100,10 @@ private:
 		this->head_ = 0;
 		this->tail_ = 0;
 
-		#pragma region initialize buffer
+#pragma region initialize buffer
 		// create buffer
-		Node *iterator_ = buffer;
-		iterator_ = new Node();
+		buffer = new Node();
+		Node* iterator_ = buffer;
 
 		// create nodes and link them
 		for (size_t i = 0; i < capacity_ - 1; ++i)
@@ -104,37 +117,35 @@ private:
 		iterator_->next = buffer;
 		buffer->prev = iterator_;
 
-		#pragma endregion
-
+#pragma endregion
 	}
 
 	/**
 	 * @brief destroy the circular buffer
 	 *
-	 * @return true
-	 * @return false
 	 */
-	bool destroy()
+	void destroy()
 	{
 		/*
 		 *  Find the last node in the circular buffer
-		 *  Then delete it and go back to the previous node until the head node is reached
+		 *  Then go back to the previous node and delete `next` until the head node is reached
 		 */
 
 		if (buffer == nullptr)
 		{
-			return true;
+			return;
 		}
 
 		auto iterator_ = buffer;
 
 		//* Recursively delete
 		//! need Test!
-		auto deleterBack = [=this](Node *node)
+		//BUG: StackOverFlow
+		auto deleterBack = [this](Node* node)
 		{
 			auto head_ = this;
-			std::function<void(Node *)> deleter_ ;
-			deleter = [&head_](Node *node)
+			static std::function<void(Node*)> deleter_;
+			deleter_ = [&head_](Node* node)
 			{
 				if (node == head_->buffer)
 				{
@@ -144,8 +155,10 @@ private:
 
 				auto prev = node->prev;
 				delete prev->next;
-				return deleter(prev);
+				return deleter_(prev);
 			};
+
+			deleter_(node);
 		};
 
 
@@ -158,33 +171,31 @@ private:
 			}
 
 			// Go back to the previous node and delete `next`
-			//TODO(Equationzhao) Unfinished
 			deleterBack(iterator_);
 		}
 	}
 
-	auto getsize_() const
+	auto getSize_() const
 	{
 		return size_;
 	}
 
-	auto getcapacity_() const
+	auto getCapacity_() const
 	{
 		return capacity_;
 	}
 
-	auto gethead_() const
+	auto getHead_() const
 	{
 		return head_;
 	}
 
-	auto gettail_() const
+	auto getTail_() const
 	{
 		return tail_;
 	}
 
 public:
-
 	// TODO(Equationzhao) impl the iterator
 	// class iterator
 
@@ -193,27 +204,72 @@ public:
 		init(capacity_);
 	}
 
-	#pragma region deleted functions
+#pragma region deleted functions
 	/*
-	        * may implement them later
-	            or
-	        ? just designed to keep them deleted
+			* may implement them later
+				or
+			? just designed to keep them deleted
 	*/
-	CircleBuffer(CircleBuffer &&other) = delete;
+	CircleBuffer(CircleBuffer&& other) = delete;
 
-	explicit CircleBuffer(const CircleBuffer &other) = delete;
+	explicit CircleBuffer(const CircleBuffer& other) = delete;
 
-	CircleBuffer &operator=(const CircleBuffer &other) = delete;
+	CircleBuffer& operator=(const CircleBuffer& other) = delete;
 
-	CircleBuffer &operator=( CircleBuffer &&other) = delete;
+	CircleBuffer& operator=(CircleBuffer&& other) = delete;
 
-	#pragma endregion
+#pragma endregion
 
-	#pragma region
+#pragma region
 	// TODO(Equationzhao) implementation details
-	auto write() {}
-	auto read() {}
-	#pragma endregion
+	auto write()
+	{
+	}
+
+	auto read()
+	{
+	}
+
+	auto clear()
+	{
+	}
+
+	auto sort()
+	{
+	}
+
+
+	auto swap()
+	{
+	}
+
+	auto erase()
+	{
+	}
+
+	auto erase_if()
+	{
+	}
+
+	[[nodiscard]] bool operator<=>(const CircleBuffer&) const
+	{
+	}
+
+	[[nodiscard]] size_t size() const
+	{
+		return getSize_();
+	}
+
+	[[nodiscard]] size_t capacity() const
+	{
+		return getCapacity_();
+	}
+
+	[[nodiscard]] bool empty() const
+	{
+		return size == 0;
+	}
+#pragma endregion
 
 
 	// TODO(Equationzhao) Support user-defined deleter
@@ -221,21 +277,7 @@ public:
 	{
 		destroy();
 	}
-
-	[[nodiscard]]auto size() const
-	{
-		return size_;
-	}
-
-	[[nodiscard]]auto capacity() const
-	{
-		return capacity_;
-	}
 };
-
-
-
-
 
 
 #endif // !CIRCLE_BUFFER
