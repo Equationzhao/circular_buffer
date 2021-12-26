@@ -1,5 +1,5 @@
 /**
- * @file circle_buffer.h
+ * @file circular_buffer.h
  * @author Equationzhao (equationzhao@foxmail.com)
  * @brief A simple concept-based C++ implementation of a circular buffer.
  * @version 0.1
@@ -11,8 +11,8 @@
 
 
 #pragma once
-#ifndef CIRCLE_BUFFER
-#define CIRCLE_BUFFER
+#ifndef CIRCULAR_BUFFER
+#define CIRCULAR_BUFFER
 
 #pragma region Includes
 
@@ -40,7 +40,7 @@ template <std::copyable T>
 		? allocator support
 		? ranges support
 */
-class CircleBuffer
+class CircularBuffer
 {
 private:
 	/**
@@ -51,48 +51,48 @@ private:
 	class Node
 	{
 	public:
-#pragma region data and pointer
-		T data{};
-		Node* next{nullptr};
-		Node* prev{nullptr};
-		Node* head{nullptr}; //TODO(Equationzhao) refactor :use distance
-#pragma endregion
+		#pragma region data and pointer
+		T data {};
+		Node *next{nullptr};
+		Node *prev{nullptr};
+		Node *head{nullptr}; //TODO(Equationzhao) refactor :use distance
+		#pragma endregion
 
-#pragma region Constructors && Destructor
+		#pragma region Constructors && Destructor
 
-		explicit Node(const T& data) : data(data)
+		explicit Node(const T &data) : data(data)
 		{
 		}
 
-		explicit Node(T&& data) : data(std::move(data))
+		explicit Node(T &&data) : data(std::move(data))
 		{
 		}
 
 		Node() = default;
 
-		Node(const Node& data) = delete;
-		Node(const Node&& data) = delete;
-		auto operator=(const Node& data) = delete;
-		auto operator=(Node&& data) = delete;
+		Node(const Node &data) = delete;
+		Node(const Node &&data) = delete;
+		auto operator=(const Node &data) = delete;
+		auto operator=(Node &&data) = delete;
 
 		virtual ~Node() = default;
 
 		// ? compare the T data it contains
 		//		or
 		//	 test `are they actually the same object`
-		bool operator==(const Node& rhs) const
+		bool operator==(const Node &rhs) const
 		{
 			return this == std::addressof(rhs);
 		}
 
 
-#pragma endregion
+		#pragma endregion
 
-#pragma region Modifiers
+		#pragma region Modifiers
 		/*
-		 * @brief write data 
+		 * @brief write data
 		 */
-		auto write(const T& dataToWrite)
+		auto write(const T &dataToWrite)
 		{
 			this->data = dataToWrite;
 		}
@@ -100,7 +100,7 @@ private:
 		/*
 		 * @brief write data
 		 */
-		auto write(T&& dataToWrite)
+		auto write(T &&dataToWrite)
 		{
 			this->data = std::move(dataToWrite);
 		}
@@ -119,7 +119,7 @@ private:
 		 * @brief  get Reference of the data
 		 * @return reference
 		 */
-		[[nodiscard]] T& get()
+		[[nodiscard]] T &get()
 		{
 			return this->data;
 		}
@@ -128,7 +128,7 @@ private:
 		 * @brief  get Reference of the data
 		 * @return reference
 		 */
-		[[nodiscard]] T& get() const
+		[[nodiscard]] T &get() const
 		{
 			return this->data;
 		}
@@ -138,20 +138,20 @@ private:
 		 * @brief  get const-reference of the data
 		 * @return  const reference
 		 */
-		[[nodiscard]] const T& const_get() const
+		[[nodiscard]] const T &const_get() const
 		{
 			return this->data;
 		}
 
-#pragma endregion
+		#pragma endregion
 	};
 
-	Node* buffer;
+	Node *buffer;
 	size_t capacity_{0};
 	size_t size_{0};
 
-	Node* toWrite;
-	Node* toRead;
+	Node *toWrite;
+	Node *toRead;
 
 	/**
 	 * @brief initialize the circular buffer
@@ -164,12 +164,13 @@ private:
 		this->size_ = 0;
 
 
-#pragma region initialize buffer
+		#pragma region initialize buffer
 		// create buffer
 		buffer = new Node();
-		Node* iterator_ = buffer;
+		Node *iterator_ = buffer;
 
 		iterator_->head = buffer;
+
 		// create nodes and link them
 		for (size_t i = 0; i < capacityToInit - 1; ++i)
 		{
@@ -186,7 +187,7 @@ private:
 		toWrite = buffer;
 		toRead = buffer;
 
-#pragma endregion
+		#pragma endregion
 	}
 
 	/**
@@ -213,7 +214,7 @@ private:
 		auto deleterBack = [this](Node* node)
 		{
 			auto head_ = this;
-			static std::function<void(Node*)> deleter_;
+			static std::function<void(Node *)> deleter_;
 			deleter_ = [&head_](Node* node)
 			{
 				if (node == head_->buffer)
@@ -244,7 +245,7 @@ private:
 		}
 	}
 
-#pragma region getters
+	#pragma region getters
 
 	[[nodiscard]] auto getSize_() const
 	{
@@ -287,7 +288,7 @@ private:
 	}
 
 
-#pragma endregion
+	#pragma endregion
 
 public:
 	class iterator
@@ -301,45 +302,46 @@ public:
 		using const_pointer = const value_type*;
 		using const_reference = const value_type&;
 	private:
-		value_type* ptr_;
+		value_type *ptr_;
 
 	public:
-		inline static Node* const end{nullptr};
+		inline static Node *const end{nullptr};
 
 
 		iterator() : ptr_(nullptr)
 		{
 		}
 
-		explicit iterator(value_type* ptr) : ptr_(ptr)
+		explicit iterator(value_type *ptr) : ptr_(ptr)
 		{
 		}
 
-		iterator(const iterator& other) : ptr_(other.ptr_)
+		iterator(const iterator &other) : ptr_(other.ptr_)
 		{
 		}
 
-		iterator(iterator&& other) noexcept : ptr_(other.ptr_)
+		iterator(iterator &&other) noexcept : ptr_(other.ptr_)
 		{
 		}
 
-		iterator& operator =(const iterator& other)
+		iterator &operator =(const iterator &other)
 		{
 			if (this == std::addressof(other))
 			{
 				return *this;
 			}
+
 			ptr_ = other.ptr_;
 			return *this;
 		}
 
-		iterator& operator =(iterator&& other) noexcept
+		iterator &operator =(iterator &&other) noexcept
 		{
 			ptr_ = other.ptr_;
 			return *this;
 		}
 
-		bool operator==(const iterator& other) const
+		bool operator==(const iterator &other) const
 		{
 			return ptr_ == other.ptr_;
 		}
@@ -359,21 +361,22 @@ public:
 			return &ptr_->data;
 		}
 
-		self& operator++()
+		self &operator++()
 		{
 			assert(ptr_ != nullptr);
 
 			if (ptr_ == ptr_->head->prev)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				ptr_ = end;
 			}
 			else
-			[[likely]]
-			{
-				ptr_ = ptr_->next;
-			}
-			return *this;
+				[[likely]]
+				{
+				    ptr_ = ptr_->next;
+				}
+
+				return *this;
 		}
 
 		self operator++(int)
@@ -383,7 +386,7 @@ public:
 			return tmp;
 		}
 
-		self& operator--()
+		self &operator--()
 		{
 			assert(ptr_ != end);
 
@@ -404,84 +407,86 @@ public:
 	};
 
 
-#pragma region Constructor && Descructor
+	#pragma region Constructor && Descructor
 
-	explicit CircleBuffer(size_t capacity_)
+	explicit CircularBuffer(size_t capacity_)
 	{
 		init(capacity_);
 	}
 
 	// TODO(Equationzhao) Support user-defined deleter
-	virtual ~CircleBuffer()
+	virtual ~CircularBuffer()
 	{
 		destroy();
 	}
 
-#pragma endregion
+	#pragma endregion
 
-#pragma region deleted functions
+	#pragma region deleted functions
 	/*
 			* may implement them later
 				or
 			? just designed to keep them deleted
 	*/
-	CircleBuffer(CircleBuffer&& other) = delete;
+	CircularBuffer(CircularBuffer &&other) = delete;
 
-	explicit CircleBuffer(const CircleBuffer& other) = delete;
+	explicit CircularBuffer(const CircularBuffer &other) = delete;
 
-	CircleBuffer& operator=(const CircleBuffer& other) = delete;
+	CircularBuffer &operator=(const CircularBuffer &other) = delete;
 
-	CircleBuffer& operator=(CircleBuffer&& other) = delete;
+	CircularBuffer &operator=(CircularBuffer &&other) = delete;
 
-#pragma endregion
+	#pragma endregion
 
-#pragma region element access
+	#pragma region element access
 
-	[[nodiscard]] T& front()
+	[[nodiscard]] T &front()
 	{
 		return buffer->get();
 	}
 
-	[[nodiscard]] T& front() const
+	[[nodiscard]] T &front() const
 	{
 		return buffer->const_get();
 	}
 
-	[[nodiscard]] const T& cfront() const
+	[[nodiscard]] const T &cfront() const
 	{
 		return buffer->const_get();
 	}
 
-	[[nodiscard]] T& back()
+	[[nodiscard]] T &back()
 	{
 		return buffer->prev->get();
 	}
 
-	[[nodiscard]] T& back() const
+	[[nodiscard]] T &back() const
 	{
 		return buffer->prev->const_get();
 	}
 
-	[[nodiscard]] const T& cback() const
+	[[nodiscard]] const T &cback() const
 	{
 		return buffer->prev->const_get();
 	}
 
-	[[nodiscard]] T& operator[](size_t index) noexcept
+	[[nodiscard]] T &operator[](size_t index) noexcept
 	{
 		auto iterator_ = buffer;
+
 		for (size_t i = 0; i < index; ++i)
 		{
 			iterator_ = iterator_->next;
 		}
+
 		return iterator_->get();
 	}
-#pragma endregion
+	#pragma endregion
 
-#pragma region Modifiers
+	#pragma region Modifiers
 	// TODO(Equationzhao) implementation details
 	// Perfect forwarding
-	auto write(T&& data)
+	auto write(T &&data)
 	{
 		toWrite->write(std::move(data));
 		toWrite = toWrite->next;
@@ -489,7 +494,7 @@ public:
 	}
 
 
-	auto write(const T& data)
+	auto write(const T &data)
 	{
 		toWrite->write(data);
 		toWrite = toWrite->next;
@@ -508,11 +513,11 @@ public:
 	/*
 	 * @brief get a copy of the data
 	 *
-	 * @return T 
+	 * @return T
 	 */
 	auto read()
 	{
-		const auto& d = toRead->data;
+		const auto &d = toRead->data;
 		toRead = toRead->next;
 		return d;
 		// not Implement yet
@@ -536,7 +541,7 @@ public:
 	 * ! need test
 	 *		O(1)
 	 */
-	auto swap(CircleBuffer& rhs) noexcept
+	auto swap(CircularBuffer &rhs) noexcept
 	{
 		if (std::addressof(rhs) == this)
 		{
@@ -572,6 +577,7 @@ public:
 			this->toRead = rhs.toRead;
 			rhs.toRead = temp5;
 		}
+
 		// not Implement yet
 	}
 
@@ -581,7 +587,8 @@ public:
 	auto reverse()
 	{
 		auto iterator_ = buffer;
-		//* exchange the next and prev pointer 
+
+		//* exchange the next and prev pointer
 		for (size_t i = 0; i < capacity_; ++i)
 		{
 			auto temp = iterator_->next;
@@ -602,12 +609,12 @@ public:
 	}
 
 
-#pragma endregion
+	#pragma endregion
 
-#pragma region iterator
+	#pragma region iterator
 
 	/*
-	 * 
+	 *
 		Since it's a circle, the begin and the end is actually the same element.
 		But in order to support range-based-for, the end iterator is designed to be a nullptr
 	 *
@@ -636,17 +643,18 @@ public:
 		return const_iterator(nullptr);
 	}
 
-#pragma endregion
+	#pragma endregion
 
-#pragma region compare
-	[[nodiscard]] auto operator<=>(const CircleBuffer&) const = default;
+	#pragma region compare
+	[[nodiscard]] auto operator<=>(const CircularBuffer &) const = default;
 
-	[[nodiscard]] bool operator==(const CircleBuffer& rhs) const
+	[[nodiscard]] bool operator==(const CircularBuffer &rhs) const
 	{
 		if (this->size() != rhs.size())
 		{
 			return false;
 		}
+
 		else
 		{
 			for (auto i = this->begin(), j = rhs.begin(); i != this->end(); ++i, ++j)
@@ -661,9 +669,9 @@ public:
 			return true;
 		}
 	}
-#pragma endregion
+	#pragma endregion
 
-#pragma region Capacity
+	#pragma region Capacity
 
 	[[nodiscard]] size_t size() const
 	{
@@ -684,4 +692,4 @@ public:
 #pragma endregion
 
 
-#endif // !CIRCLE_BUFFER
+#endif // !CIRCULAR_BUFFER

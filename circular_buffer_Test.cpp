@@ -1,9 +1,14 @@
 // #include <gtest/gtest.h>
-#include "circle_buffer.h"
+#include "circular_buffer.h"
 #include <chrono>
 #include <iostream>
+#include <list>
 #include <map>
+#include <memory>
+#include <string>
 #include <vector>
+
+
 constexpr int N = 10;
 
 
@@ -14,18 +19,20 @@ struct data
 {
 	std::vector<std::list<uint16_t>> a;
 	int c;
-	double* b;
+	double *b;
 	std::unique_ptr<std::map<std::string, int>> e;
 
 	data(int aa): c(aa)
 	{
 		std::cout << "ctor\n";
+
 		for (size_t i = 0; i < 100; ++i)
 		{
 			a.emplace_back(100);
 		}
+
 		b = new double(321);
-		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int>{{"12", 1}});
+		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int> {{"12", 1}});
 
 		++ctimes;
 	}
@@ -33,18 +40,20 @@ struct data
 	data()
 	{
 		std::cout << "ctor\n";
+
 		for (size_t i = 0; i < 100; ++i)
 		{
 			a.emplace_back(100);
 		}
+
 		c = 1;
 		b = new double(321);
-		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int>{{"12", 1}});
+		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int> {{"12", 1}});
 
 		++ctimes;
 	}
 
-	data(const data& other) : c(other.c), b(new double(*other.b))
+	data(const data &other) : c(other.c), b(new double(*other.b))
 	{
 		std::cout << "copy\n";
 		auto temp = *other.e;
@@ -52,14 +61,14 @@ struct data
 		++ctimes;
 	}
 
-	data(data&& other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
+	data(data &&other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
 	{
 		std::cout << "move\n";
 		other.b = nullptr;
 		++ctimes;
 	}
 
-	data& operator =(const data& other) noexcept
+	data &operator =(const data &other) noexcept
 	{
 		std::cout << "copy\n";
 		a = other.a;
@@ -70,7 +79,7 @@ struct data
 		return *this;
 	}
 
-	data& operator =(data&& other) noexcept
+	data &operator =(data &&other) noexcept
 	{
 		std::cout << "move\n";
 		a = std::move(other.a);
@@ -101,9 +110,9 @@ int main()
 		// {
 		// 	list.emplace_back(data());
 		// }
-		CircleBuffer<data> buffer(N), buffer2(2 * N);
+		CircularBuffer<data> buffer(N), buffer2(2 * N);
 
-		// CircleBuffer<int> buffer2{10086};
+		// CircularBuffer<int> buffer2{10086};
 		// auto begin0 = buffer.begin();
 		// auto end0 = buffer.end();
 		// const auto begin1 = buffer.begin();
@@ -148,7 +157,7 @@ int main()
 
 
 		//
-		// for (const auto& i : buffer) 
+		// for (const auto& i : buffer)
 		// {
 		// 	std::cout << i.c << '\n';
 		// }
@@ -184,10 +193,12 @@ int main()
 		// }
 
 		data c(100);
+
 		for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
 		{
 			buffer.write(std::move(c));
 		}
+
 		//
 		// for (const auto& data : buffer)
 		// {
@@ -198,6 +209,6 @@ int main()
 	const auto end = std::chrono::high_resolution_clock::now();
 
 	std::cout << "costing time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-		<< "ms\n";
+	          << "ms\n";
 	std::cout << ctimes << "\n" << dtimes << "\n";
 }
