@@ -20,7 +20,7 @@ struct data
 {
 	std::vector<std::list<uint16_t>> a;
 	int c;
-	double* b;
+	double *b;
 	std::unique_ptr<std::map<std::string, int>> e;
 
 	data(int aa): c(aa)
@@ -33,7 +33,7 @@ struct data
 		}
 
 		b = new double(321);
-		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int>{{"12", 1}});
+		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int> {{"12", 1}});
 
 		++ctimes;
 	}
@@ -49,12 +49,12 @@ struct data
 
 		c = 1;
 		b = new double(321);
-		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int>{{"12", 1}});
+		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int> {{"12", 1}});
 
 		++ctimes;
 	}
 
-	data(const data& other) : c(other.c), b(new double(*other.b))
+	data(const data &other) : c(other.c), b(new double(*other.b))
 	{
 		std::cout << "copy\n";
 		auto temp = *other.e;
@@ -62,19 +62,20 @@ struct data
 		++ctimes;
 	}
 
-	data(data&& other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
+	data(data &&other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
 	{
 		std::cout << "move\n";
 		other.b = nullptr;
 		++ctimes;
 	}
 
-	data& operator =(const data& other) noexcept
+	data &operator =(const data &other) noexcept
 	{
 		if (this == std::addressof(other))
 		{
 			return *this;
 		}
+
 		std::cout << "copy\n";
 		a = other.a;
 		c = other.c;
@@ -84,12 +85,13 @@ struct data
 		return *this;
 	}
 
-	data& operator =(data&& other) noexcept
+	data &operator =(data &&other) noexcept
 	{
 		if (this == std::addressof(other))
 		{
 			return *this;
 		}
+
 		std::cout << "move\n";
 		a = std::move(other.a);
 		c = other.c;
@@ -144,7 +146,7 @@ int main()
 		std::sort(buffer.begin(), buffer.end());
 
 
-		for (auto&& i : buffer)
+		for (auto &&i : buffer)
 		{
 			std::cout << i.c << '\n';
 		}
@@ -153,6 +155,6 @@ int main()
 	const auto end = std::chrono::high_resolution_clock::now();
 
 	std::cout << "costing time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-		<< "ms\n";
+	          << "ms\n";
 	std::cout << ctimes << "\n" << dtimes << "\n";
 }
