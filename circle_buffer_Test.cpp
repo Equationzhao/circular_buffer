@@ -4,7 +4,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
-constexpr int N = 200;
+constexpr int N = 10;
 
 
 int ctimes = 0;
@@ -17,9 +17,22 @@ struct data
 	double* b;
 	std::unique_ptr<std::map<std::string, int>> e;
 
+	data(int aa): c(aa)
+	{
+		std::cout << "ctor\n";
+		for (size_t i = 0; i < 100; ++i)
+		{
+			a.emplace_back(100);
+		}
+		b = new double(321);
+		e = std::make_unique<std::map<std::string, int>>(std::map<std::string, int>{{"12", 1}});
+
+		++ctimes;
+	}
 
 	data()
 	{
+		std::cout << "ctor\n";
 		for (size_t i = 0; i < 100; ++i)
 		{
 			a.emplace_back(100);
@@ -33,6 +46,7 @@ struct data
 
 	data(const data& other) : c(other.c), b(new double(*other.b))
 	{
+		std::cout << "copy\n";
 		auto temp = *other.e;
 		e = std::make_unique<std::map<std::string, int>>(temp);
 		++ctimes;
@@ -40,12 +54,14 @@ struct data
 
 	data(data&& other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
 	{
+		std::cout << "move\n";
 		other.b = nullptr;
 		++ctimes;
 	}
 
 	data& operator =(const data& other) noexcept
 	{
+		std::cout << "copy\n";
 		a = other.a;
 		c = other.c;
 		*b = *other.b;
@@ -56,7 +72,8 @@ struct data
 
 	data& operator =(data&& other) noexcept
 	{
-		a.swap(other.a);
+		std::cout << "move\n";
+		a = std::move(other.a);
 		c = other.c;
 		delete b;
 		b = other.b;
@@ -67,6 +84,7 @@ struct data
 
 	~data()
 	{
+		std::cout << "des\n";
 		delete b;
 		++dtimes;
 	}
@@ -98,28 +116,55 @@ int main()
 		auto&& end8 = buffer.cend();
 
 
-		for (auto i : buffer)
+		// for (auto i : buffer)
+		// {
+		// 	std::cout << i.c << '\n';
+		// }
+		//
+		// for (const auto& i : buffer) 
+		// {
+		// 	std::cout << i.c << '\n';
+		// }
+
+		// for (auto& i : buffer)
+		// {
+		// 	std::cout << i.c << '\n';
+		// }
+		//
+		// for (auto&& i : buffer)
+		// {
+		// 	std::cout << i.c << '\n';
+		// }
+		//
+		// for (auto i = buffer.begin(); i != buffer.end(); ++i)
+		// {
+		// 	std::cout << i->c << '\n';
+		// }
+		//
+		// for (auto&& i = buffer.begin(); i != buffer.end(); ++i)
+		// {
+		// 	std::cout << i->c << '\n';
+		// }
+
+		// for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
+		// {
+		// 	std::cout << buffer.read().c << '\n';
+		// }
+
+		// for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
+		// {
+		// 	std::cout << buffer[i].c << '\n';
+		// }
+
+		data c(100);
+		for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
 		{
+			buffer.write(c); //BUG :c was unexpectedly move-copied instead of normal-copied
 		}
 
-		for (const auto& i : buffer)
+		for (const auto& data : buffer)
 		{
-		}
-
-		for (auto& i : buffer)
-		{
-		}
-
-		for (auto&& i : buffer)
-		{
-		}
-
-		for (auto i = buffer.begin(); i != buffer.end(); ++i)
-		{
-		}
-
-		for (auto&& i = buffer.begin(); i != buffer.end(); ++i)
-		{
+			std::cout << data.c << '\n';
 		}
 	}
 

@@ -9,19 +9,21 @@
  *
  */
 
+// ReSharper disable once CppMissingIncludeGuard
+
 #pragma once
 #ifndef CIRCLE_BUFFER
 #define CIRCLE_BUFFER
 
 #pragma region Includes
 
+#include <assert.h>
 #include <concepts>
 #include <cstddef>
 #include <functional>
 #include <iterator>
 #include <new>
 #include <utility>
-
 
 #pragma endregion
 
@@ -33,6 +35,7 @@ template <std::copyable T>
 		* Add concept Support
 		* Add constexpr support
 		* Add user-defined comparator support
+		* Add user-defined deleter support
 		* Use placement new instead of operator new
 		? Module support
 		? allocator support
@@ -53,6 +56,7 @@ private:
 		T data{};
 		Node* next{nullptr};
 		Node* prev{nullptr};
+		Node* head{nullptr};
 #pragma endregion
 
 #pragma region Constructors && Destructor
@@ -138,6 +142,9 @@ private:
 	size_t capacity_{0};
 	size_t size_{0};
 
+	Node* toWrite;
+	Node* toRead;
+
 	/**
 	 * @brief initialize the circular buffer
 	 *
@@ -154,18 +161,22 @@ private:
 		buffer = new Node();
 		Node* iterator_ = buffer;
 
-
+		iterator_->head = buffer;
 		// create nodes and link them
 		for (size_t i = 0; i < capacityToInit - 1; ++i)
 		{
 			iterator_->next = new Node();
 			iterator_->next->prev = iterator_;
 			iterator_ = iterator_->next;
+			iterator_->head = buffer;
 		}
 
 		// make it circular
 		iterator_->next = buffer;
 		buffer->prev = iterator_;
+
+		toWrite = buffer;
+		toRead = buffer;
 
 #pragma endregion
 	}
@@ -267,6 +278,7 @@ private:
 		return &buffer->prev->data;
 	}
 
+
 #pragma endregion
 
 public:
@@ -285,6 +297,9 @@ public:
 		value_type* ptr_;
 
 	public:
+		inline static Node* const end{nullptr};
+
+
 		iterator() : ptr_(nullptr)
 		{
 		}
@@ -327,7 +342,7 @@ public:
 			return ptr_->get();
 		}
 
-		reference operator*() const
+		const_reference operator*() const
 		{
 			return ptr_->const_get();
 		}
@@ -339,7 +354,16 @@ public:
 
 		self& operator++()
 		{
-			ptr_ = ptr_->next;
+			if (ptr_ == ptr_->head->prev)
+			[[unlikely]]
+			{
+				ptr_ = end;
+			}
+			else
+			[[likely]]
+			{
+				ptr_ = ptr_->next;
+			}
 			return *this;
 		}
 
@@ -352,7 +376,10 @@ public:
 
 		self& operator--()
 		{
+			assert(ptr_ == end);
+
 			ptr_ = ptr_->prev;
+
 			return *this;
 		}
 
@@ -362,6 +389,9 @@ public:
 			--(*this);
 			return tmp;
 		}
+
+
+		virtual ~iterator() = default;
 	};
 
 
@@ -408,7 +438,7 @@ public:
 		return buffer->const_get();
 	}
 
-	[[nodiscard]] T& cfront() const
+	[[nodiscard]] const T& cfront() const
 	{
 		return buffer->const_get();
 	}
@@ -423,17 +453,30 @@ public:
 		return buffer->prev->const_get();
 	}
 
-	[[nodiscard]] T& cback() const
+	[[nodiscard]] const T& cback() const
 	{
 		return buffer->prev->const_get();
 	}
 
+	[[nodiscard]] T& operator[](size_t index) noexcept
+	{
+		auto iterator_ = buffer;
+		for (size_t i = 0; i < index; ++i)
+		{
+			iterator_ = iterator_->next;
+		}
+		return iterator_->get();
+	}
 #pragma endregion
 
 #pragma region Modifiers
 	// TODO(Equationzhao) implementation details
-	auto write()
+	// Perfect forwarding
+	// BUG
+	auto write(auto&& data)
 	{
+		toWrite->write(std::forward<T>(data));
+		toWrite = toWrite->next;
 		// not Implement yet
 	}
 
@@ -447,11 +490,22 @@ public:
 		// not Implement yet
 	}
 
+	/*
+	 * @brief get a copy of the data
+	 *
+	 * @return T 
+	 */
 	auto read()
 	{
+		const auto& d = toRead->data;
+		toRead = toRead->next;
+		return d;
 		// not Implement yet
 	}
 
+	/*
+	 * TODO(Equationzhao) clear the memory
+	 */
 	auto clear()
 	{
 		// not Implement yet
@@ -462,7 +516,23 @@ public:
 		// not Implement yet
 	}
 
-	auto swap()
+	/*
+	 * @brief swap the pointer
+	 * ! need test
+	 *		O(1)
+	 */
+	auto swap(CircleBuffer& rhs) noexcept
+	{
+		auto temp = this->buffer;
+		this->buffer = rhs.buffer;
+		rhs.buffer = temp;
+		// not Implement yet
+	}
+
+	/*
+	 * @brief reverse the circle buffer
+	 */
+	auto reverse()
 	{
 		// not Implement yet
 	}
@@ -483,8 +553,9 @@ public:
 #pragma region iterator
 
 	/*
-	 * @brief
-		? Since it's a circle, the begin and the end is actually the same element.
+	 * 
+		Since it's a circle, the begin and the end is actually the same element.
+		But in order to support range-based-for, the end iterator is set to be a nullptr
 	 *
 	 */
 
@@ -496,19 +567,19 @@ public:
 
 	[[nodiscard]] iterator end()
 	{
-		return iterator(buffer);
+		return iterator(iterator::end);
 	}
 
 	using const_iterator = iterator;
 
 	[[nodiscard]] const_iterator cbegin() const
 	{
-		return const_iterator(buffer);
+		return const_iterator(iterator::end);
 	}
 
 	[[nodiscard]] const_iterator cend() const
 	{
-		return const_iterator(buffer);
+		return const_iterator(nullptr);
 	}
 
 #pragma endregion
