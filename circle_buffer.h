@@ -9,7 +9,6 @@
  *
  */
 
-// ReSharper disable once CppMissingIncludeGuard
 
 #pragma once
 #ifndef CIRCLE_BUFFER
@@ -17,7 +16,7 @@
 
 #pragma region Includes
 
-#include <assert.h>
+#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <functional>
@@ -56,7 +55,7 @@ private:
 		T data{};
 		Node* next{nullptr};
 		Node* prev{nullptr};
-		Node* head{nullptr};
+		Node* head{nullptr}; //TODO(Equationzhao) refactor :use distance
 #pragma endregion
 
 #pragma region Constructors && Destructor
@@ -77,6 +76,13 @@ private:
 		auto operator=(Node&& data) = delete;
 
 		virtual ~Node() = default;
+
+
+		bool operator==(const Node& rhs) const
+		{
+			return this == std::addressof(rhs);
+		}
+
 
 #pragma endregion
 
@@ -101,7 +107,7 @@ private:
 		 * @brief get a copy of the data
 		 * @return value
 		 */
-		[[nodiscard]] auto read() const
+		[[nodiscard]] T read() const
 		{
 			return this->data;
 		}
@@ -318,7 +324,7 @@ public:
 
 		iterator& operator =(const iterator& other)
 		{
-			if (this == &other)
+			if (this == std::addressof(other))
 			{
 				return *this;
 			}
@@ -354,6 +360,8 @@ public:
 
 		self& operator++()
 		{
+			assert(ptr_ != nullptr);
+
 			if (ptr_ == ptr_->head->prev)
 			[[unlikely]]
 			{
@@ -376,7 +384,7 @@ public:
 
 		self& operator--()
 		{
-			assert(ptr_ == end);
+			assert(ptr_ != end);
 
 			ptr_ = ptr_->prev;
 
@@ -517,15 +525,46 @@ public:
 	}
 
 	/*
-	 * @brief swap the pointer
+	 * @brief swap the pointer and data member
 	 * ! need test
 	 *		O(1)
 	 */
 	auto swap(CircleBuffer& rhs) noexcept
 	{
-		auto temp = this->buffer;
-		this->buffer = rhs.buffer;
-		rhs.buffer = temp;
+		if (std::addressof(rhs) == this)
+		{
+			return;
+		}
+
+		{
+			auto temp = this->buffer;
+			this->buffer = rhs.buffer;
+			rhs.buffer = temp;
+		}
+
+		{
+			auto temp2 = this->capacity_;
+			this->capacity_ = rhs.capacity_;
+			rhs.capacity_ = temp2;
+		}
+
+		{
+			auto temp3 = this->size_;
+			this->size_ = rhs.size_;
+			rhs.size_ = temp3;
+		}
+
+		{
+			auto temp4 = this->toWrite;
+			this->toWrite = rhs.toWrite;
+			rhs.toWrite = temp4;
+		}
+
+		{
+			auto temp5 = this->toRead;
+			this->toRead = rhs.toRead;
+			rhs.toRead = temp5;
+		}
 		// not Implement yet
 	}
 
@@ -534,7 +573,15 @@ public:
 	 */
 	auto reverse()
 	{
-		// not Implement yet
+		auto iterator_ = buffer;
+		//* exchange the next and prev pointer 
+		for (size_t i = 0; i < capacity_; ++i)
+		{
+			auto temp = iterator_->next;
+			iterator_->next = iterator_->prev;
+			iterator_->prev = temp;
+			iterator_ = iterator_->next;
+		}
 	}
 
 	auto erase()
@@ -555,17 +602,17 @@ public:
 	/*
 	 * 
 		Since it's a circle, the begin and the end is actually the same element.
-		But in order to support range-based-for, the end iterator is set to be a nullptr
+		But in order to support range-based-for, the end iterator is designed to be a nullptr
 	 *
 	 */
 
 
-	[[nodiscard]] iterator begin()
+	[[nodiscard]] iterator begin() const
 	{
 		return iterator(buffer);
 	}
 
-	[[nodiscard]] iterator end()
+	[[nodiscard]] iterator end() const
 	{
 		return iterator(iterator::end);
 	}
@@ -585,10 +632,7 @@ public:
 #pragma endregion
 
 #pragma region compare
-	[[nodiscard]] bool operator<=>(const CircleBuffer&) const
-	{
-		// not Implement yet
-	}
+	[[nodiscard]] auto operator<=>(const CircleBuffer&) const = default;
 
 	[[nodiscard]] bool operator==(const CircleBuffer& rhs) const
 	{
@@ -598,20 +642,16 @@ public:
 		}
 		else
 		{
-			bool flag{true};
-
-
-			// ? refactor
-			for (size_t i = 0; i <= size; ++i)
+			for (auto i = this->begin(), j = rhs.begin(); i != this->end(); ++i, ++j)
 			{
-				if (this->begin() + i != rhs.begin() + i)
+				if (*i != *j)
 				{
-					flag = false;
-					break;
+					return false;
 				}
 			}
 
-			return flag;
+
+			return true;
 		}
 	}
 #pragma endregion

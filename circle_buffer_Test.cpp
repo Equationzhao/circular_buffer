@@ -96,30 +96,57 @@ int main()
 	const auto start = std::chrono::high_resolution_clock::now();
 
 	{
-		CircleBuffer<data> buffer(N);
+		// std::list<data> list;
+		// for (int i = 0; i < N; ++i)
+		// {
+		// 	list.emplace_back(data());
+		// }
+		CircleBuffer<data> buffer(N), buffer2(2 * N);
+
 		// CircleBuffer<int> buffer2{10086};
-		auto begin0 = buffer.begin();
-		auto end0 = buffer.end();
-		const auto begin1 = buffer.begin();
-		const auto end1 = buffer.end();
-		const auto& begin2 = buffer.begin();
-		const auto& end2 = buffer.end();
-		auto&& begin3 = buffer.begin();
-		auto&& end3 = buffer.end();
-		auto begin5 = buffer.cbegin();
-		auto end5 = buffer.cend();
-		const auto begin6 = buffer.cbegin();
-		const auto end6 = buffer.cend();
-		const auto& begin7 = buffer.cbegin();
-		const auto& end7 = buffer.cend();
-		auto&& begin8 = buffer.cbegin();
-		auto&& end8 = buffer.cend();
+		// auto begin0 = buffer.begin();
+		// auto end0 = buffer.end();
+		// const auto begin1 = buffer.begin();
+		// const auto end1 = buffer.end();
+		// const auto& begin2 = buffer.begin();
+		// const auto& end2 = buffer.end();
+		// auto&& begin3 = buffer.begin();
+		// auto&& end3 = buffer.end();
+		// auto begin5 = buffer.cbegin();
+		// auto end5 = buffer.cend();
+		// const auto begin6 = buffer.cbegin();
+		// const auto end6 = buffer.cend();
+		// const auto& begin7 = buffer.cbegin();
+		// const auto& end7 = buffer.cend();
+		// auto&& begin8 = buffer.cbegin();
+		// auto&& end8 = buffer.cend();
 
 
+		// for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
+		// {
+		// 	buffer.write(i);
+		// }
+		//
+		// for (size_t i = 0, end = buffer2.capacity(); i < end; ++i)
+		// {
+		// 	buffer2.write(i);
+		// }
+		//
+		//
 		// for (auto i : buffer)
 		// {
 		// 	std::cout << i.c << '\n';
 		// }
+		//
+		//
+		// buffer.swap(buffer);
+		//
+		// for (auto i : buffer)
+		// {
+		// 	std::cout << i.c << '\n';
+		// }
+
+
 		//
 		// for (const auto& i : buffer) 
 		// {
@@ -156,16 +183,16 @@ int main()
 		// 	std::cout << buffer[i].c << '\n';
 		// }
 
-		data c(100);
-		for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
-		{
-			buffer.write(c); //BUG :c was unexpectedly move-copied instead of normal-copied
-		}
-
-		for (const auto& data : buffer)
-		{
-			std::cout << data.c << '\n';
-		}
+		// data c(100);
+		// for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
+		// {
+		// 	buffer.write(c); //BUG :c was unexpectedly move-copied instead of normal-copied
+		// }
+		//
+		// for (const auto& data : buffer)
+		// {
+		// 	std::cout << data.c << '\n';
+		// }
 	}
 
 	const auto end = std::chrono::high_resolution_clock::now();
