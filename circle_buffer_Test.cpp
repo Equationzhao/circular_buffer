@@ -183,11 +183,11 @@ int main()
 		// 	std::cout << buffer[i].c << '\n';
 		// }
 
-		// data c(100);
-		// for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
-		// {
-		// 	buffer.write(c); //BUG :c was unexpectedly move-copied instead of normal-copied
-		// }
+		data c(100);
+		for (size_t i = 0, end = buffer.capacity(); i < end; ++i)
+		{
+			buffer.write(std::move(c));
+		}
 		//
 		// for (const auto& data : buffer)
 		// {

@@ -77,7 +77,9 @@ private:
 
 		virtual ~Node() = default;
 
-
+		// ? compare the T data it contains
+		//		or
+		//	 test `are they actually the same object`
 		bool operator==(const Node& rhs) const
 		{
 			return this == std::addressof(rhs);
@@ -288,7 +290,6 @@ private:
 #pragma endregion
 
 public:
-	// TODO(Equationzhao) implements the iterator
 	class iterator
 	{
 		using iterator_category = std::bidirectional_iterator_tag;
@@ -480,12 +481,18 @@ public:
 #pragma region Modifiers
 	// TODO(Equationzhao) implementation details
 	// Perfect forwarding
-	// BUG
-	auto write(auto&& data)
+	auto write(T&& data)
 	{
-		toWrite->write(std::forward<T>(data));
+		toWrite->write(std::move(data));
 		toWrite = toWrite->next;
 		// not Implement yet
+	}
+
+
+	auto write(const T& data)
+	{
+		toWrite->write(data);
+		toWrite = toWrite->next;
 	}
 
 	auto insert()
