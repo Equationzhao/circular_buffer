@@ -4,6 +4,7 @@
 
 ## Features
 
+- *Header Only*
 - iterator support (in process)
 - constexpr support (in process)
 - user-defined allocator support (in process)
