@@ -1,6 +1,6 @@
-# Circle Buffer
+# Circular Buffer
 
-## This is a tiny c++ implementation of circle buffer (Circular linked list based).
+## This is a tiny c++ implementation of circular buffer (Circular linked list based).
 
 ## Features
 
