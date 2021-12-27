@@ -1013,6 +1013,7 @@ public:
 
 	/*
 	 * @brief reverse the circle buffer
+	 * // TODO(Equationzhao) update distance
 	 */
 	auto reverse()
 	{
