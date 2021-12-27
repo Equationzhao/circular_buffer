@@ -907,7 +907,7 @@ public:
 	// not recommended
 	[[nodiscard]] T& at(const size_t index)
 	{
-		if (index > size)
+		if (index > size())
 		{
 			throw std::runtime_error("");
 		}
