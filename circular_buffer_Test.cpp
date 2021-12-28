@@ -25,7 +25,7 @@ struct data
 
 	data(int aa): c(aa)
 	{
-		std::cout << "ctor\n";
+		// std::cout << "ctor\n";
 
 		for (size_t i = 0; i < 100; ++i)
 		{
@@ -40,7 +40,7 @@ struct data
 
 	data()
 	{
-		std::cout << "ctor\n";
+		// std::cout << "ctor\n";
 
 		for (size_t i = 0; i < 100; ++i)
 		{
@@ -56,7 +56,7 @@ struct data
 
 	data(const data& other) : c(other.c), b(new double(*other.b))
 	{
-		std::cout << "copy\n";
+		// std::cout << "copy\n";
 		auto temp = *other.e;
 		e = std::make_unique<std::map<std::string, int>>(temp);
 		++ctimes;
@@ -64,7 +64,7 @@ struct data
 
 	data(data&& other) : a(std::move(other.a)), c(other.c), b(other.b), e(std::move(other.e))
 	{
-		std::cout << "move\n";
+		// std::cout << "move\n";
 		other.b = nullptr;
 		++ctimes;
 	}
@@ -76,7 +76,7 @@ struct data
 			return *this;
 		}
 
-		std::cout << "copy\n";
+		// std::cout << "copy\n";
 		a = other.a;
 		c = other.c;
 		*b = *other.b;
@@ -92,7 +92,7 @@ struct data
 			return *this;
 		}
 
-		std::cout << "move\n";
+		// std::cout << "move\n";
 		a = std::move(other.a);
 		c = other.c;
 		delete b;
@@ -104,7 +104,7 @@ struct data
 
 	~data()
 	{
-		std::cout << "des\n";
+		// std::cout << "des\n";
 		delete b;
 		++dtimes;
 	}
@@ -125,7 +125,7 @@ int main()
 		CircularBuffer<data>::circular_iterator it(buffer.circular_begin());
 		for (size_t i = 0, size = buffer.capacity(); i < 10 * size; ++i)
 		{
-			std::cout << it->c;
+			// std::cout << it->c;
 			--it;
 		}
 
