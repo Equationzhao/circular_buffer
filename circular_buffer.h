@@ -1061,7 +1061,7 @@ public:
 		Since it's a circle, the begin() and the end() is actually the same element.
 		But in order to support range-based-for, the end iterator is designed to be a nullptr
 		to access the what the `end` contains will call abort
-		operator like prefix++/--,suffix++/--,+=,-= is legal for the `end` 
+		operator like prefix++/--,suffix++/--,+=,-= is also **illegal** for the `end` !
 	 *
 	 */
 
@@ -1080,12 +1080,12 @@ public:
 
 	[[nodiscard]] constexpr const_iterator cbegin() const
 	{
-		return const_iterator(iterator::end, this);
+		return const_iterator(iterator::end, this);// TODO
 	}
 
 	[[nodiscard]] constexpr const_iterator cend() const
 	{
-		return const_iterator(iterator::end, this);
+		return const_iterator(iterator::end, this);// TODO
 	}
 
 
