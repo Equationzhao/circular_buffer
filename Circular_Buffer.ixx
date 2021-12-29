@@ -1,28 +1,15 @@
-/**
- * @file circular_buffer.h
- * @author Equationzhao (equationzhao@foxmail.com)
- * @brief A simple concept-based C++ implementation of a circular buffer.
- * @version 0.1
- * @date 2021-12-24
- *
- * @copyright Copyright (c) 2021
- *
- */
-
-#pragma once
-#ifndef CIRCULAR_BUFFER
-#define CIRCULAR_BUFFER
+export module Circular_Buffer;
 
 
 #pragma region Includes
-#include <cassert>;
-#include <concepts>;
-#include <cstddef>;
-#include <functional>;
-#include <iterator>;
-#include <new>;
-#include <stdexcept>;
-#include <utility>;
+import <cassert>;
+import <concepts>;
+import <cstddef>;
+import <functional>;
+import <iterator>;
+import <new>;
+import <stdexcept>;
+import <utility>;
 
 #pragma endregion
 
@@ -37,7 +24,7 @@ constexpr auto make_observer(T& obj)
 
 
 // template<typename T, class Allocator = std::allocator<T>>
-template <std::copyable T, class Alloc = std::allocator<T>>
+export template <std::copyable T, class Alloc = std::allocator<T>>
 /*
 	TODO(Equationzhao):
 		* refactor size_t in operator +,-,+=,-= of iterator
@@ -64,10 +51,10 @@ private:
 		using value_type = T;
 #pragma region data and pointer
 		value_type data{};
-		observer_ptr<Node> next{nullptr};
-		observer_ptr<Node> prev{nullptr};
-		observer_ptr<Node> head{nullptr};
-		size_t distance{0};
+		observer_ptr<Node> next{ nullptr };
+		observer_ptr<Node> prev{ nullptr };
+		observer_ptr<Node> head{ nullptr };
+		size_t distance{ 0 };
 		//TODO(Equationzhao) refactor :use distance,
 		// ? is the variable head still necessary ?
 #pragma endregion
@@ -85,12 +72,12 @@ private:
 		constexpr Node() = default;
 
 		constexpr Node(const Node& other) : data(other.data), next(other.next), prev(other.prev),
-											distance(other.distance)
+			distance(other.distance)
 		{
 		}
 
-		constexpr Node(Node&& other) noexcept: data(std::move(other.data)), next(other.next), prev(other.prev),
-											   distance(other.distance)
+		constexpr Node(Node&& other) noexcept : data(std::move(other.data)), next(other.next), prev(other.prev),
+			distance(other.distance)
 		{
 		}
 
@@ -188,8 +175,8 @@ private:
 	};
 
 	observer_ptr<Node> buffer;
-	size_t capacity_{0};
-	size_t size_{0};
+	size_t capacity_{ 0 };
+	size_t size_{ 0 };
 
 	observer_ptr<Node> toWrite;
 	observer_ptr<Node> toRead;
@@ -215,7 +202,7 @@ private:
 
 		// create nodes and link them
 		// update head and distance
-		size_t distance{0};
+		size_t distance{ 0 };
 		iterator_->distance = distance;
 
 		for (size_t i = 0; i < capacityToInit - 1; ++i)
@@ -375,7 +362,7 @@ public:
 
 
 	public:
-		constexpr inline static observer_ptr<Node> end{nullptr};
+		constexpr inline static observer_ptr<Node> end{ nullptr };
 
 
 		iterator() : ptr_(nullptr), proxy_(nullptr)
@@ -397,7 +384,7 @@ public:
 		iterator& operator =(const iterator& other)
 		{
 			if (this == std::addressof(other))
-			[[unlikely]]
+				[[unlikely]]
 			{
 				return *this;
 			}
@@ -446,12 +433,12 @@ public:
 			assert(ptr_ != end);
 
 			if (ptr_ == ptr_->head->prev)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				ptr_ = end;
 			}
 			else
-			[[likely]]
+				[[likely]]
 			{
 				ptr_ = ptr_->next;
 			}
@@ -460,7 +447,7 @@ public:
 		}
 
 
-		constexpr self operator++(int) &
+		constexpr self operator++(int)&
 		{
 			self tmp = *this;
 
@@ -479,13 +466,13 @@ public:
 			// assert(ptr_ != end);
 
 			if (n == 0)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				return *this;
 			}
 
-			if (n < 0)
-			[[unlikely]]
+				if (n < 0)
+					[[unlikely]]
 			{
 				return (*this -= -n);
 			}
@@ -504,7 +491,7 @@ public:
 			assert(this->ptr_ == proxy_->buffer);
 
 			if (this->ptr_ == end)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				this->ptr_ = proxy_->buffer->prev;
 			}
@@ -518,7 +505,7 @@ public:
 		// ! need test
 		// rely on the implementation of prefix--
 		// when n>distance it will continue self-sub from the beginning
-		constexpr self operator--(int) &
+		constexpr self operator--(int)&
 		{
 			self tmp = *this;
 			--(*this);
@@ -538,7 +525,7 @@ public:
 			const auto iterator_ = this->ptr_;
 
 			if (iterator_ == end)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				if (rhs.ptr_ == end)
 				[[unlikely]]
@@ -552,8 +539,8 @@ public:
 				}
 			}
 
-			if (rhs.ptr_ == end)
-			[[unlikely]]
+				if (rhs.ptr_ == end)
+					[[unlikely]]
 			{
 				return iterator_->distance;
 			}
@@ -568,13 +555,13 @@ public:
 		constexpr self& operator-=(const difference_type n)
 		{
 			if (n == 0)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				return *this;
 			}
 
-			if (n < 0)
-			[[unlikely]]
+				if (n < 0)
+					[[unlikely]]
 			{
 				for (size_t i = 0; i < -n; ++i)
 				{
@@ -583,7 +570,7 @@ public:
 				return *this;
 			}
 
-			// assert (ptr_!=end)
+				// assert (ptr_!=end)
 			for (size_t i = 0; i < n; ++i)
 			{
 				--(*this);
@@ -651,7 +638,7 @@ public:
 		}
 
 		constexpr explicit
-		circular_iterator(observer_ptr<value_type> ptr, const_container_ptr proxy) : ptr_(ptr), proxy_(proxy)
+			circular_iterator(observer_ptr<value_type> ptr, const_container_ptr proxy) : ptr_(ptr), proxy_(proxy)
 		{
 		}
 
@@ -667,7 +654,7 @@ public:
 		constexpr circular_iterator& operator =(const circular_iterator& other)
 		{
 			if (this == std::addressof(other))
-			[[unlikely]]
+				[[unlikely]]
 			{
 				return *this;
 			}
@@ -721,7 +708,7 @@ public:
 		 *		circular_iterator will iterate circular_buffer circularly
 		 *	rely on the implementation of prefix++
 		 */
-		constexpr self operator++(int) &
+		constexpr self operator++(int)&
 		{
 			self tmp = *this;
 
@@ -738,7 +725,7 @@ public:
 		constexpr self operator+(const size_t n)
 		{
 			if (n == 0)
-			[[unlikely]]
+				[[unlikely]]
 			{
 				return *this;
 			}
@@ -774,7 +761,7 @@ public:
 		// ! need test
 		// rely on the implementation of prefix--
 		// when n>distance it will continue self-sub from the beginning
-		constexpr self operator--(int) &
+		constexpr self operator--(int)&
 		{
 			self tmp = *this;
 			--(*this);
@@ -1115,7 +1102,7 @@ public:
 #pragma region compare
 	[[nodiscard]] constexpr auto operator<=>(const CircularBuffer&) const = default;
 
-	[[nodiscard]] constexpr auto operator==(const CircularBuffer& rhs) const
+	[[nodiscard]] constexpr auto operator==(const CircularBuffer & rhs) const
 	{
 		if (this->size() != rhs.size())
 		{
@@ -1161,13 +1148,13 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	difference_type n) const
 {
 	if (n == 0)
-	[[unlikely]]
+		[[unlikely]]
 	{
 		return *this;
 	}
 
-	if (n < 0)
-	[[unlikely]]
+		if (n < 0)
+			[[unlikely]]
 	{
 		return *this - (-n);
 	}
@@ -1182,7 +1169,7 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	for (size_t i = 0; i < t; ++i)
 	{
 		if (iterator_ == iterator_->head->prev)
-		[[unlikely]]
+			[[unlikely]]
 		{
 			iterator_ = end;
 		}
@@ -1202,20 +1189,20 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	auto iterator_ = ptr_;
 
 	if (n == 0)
-	[[unlikely]]
+		[[unlikely]]
 	{
 		return *this;
 	}
 
-	if (n < 0)
-	[[unlikely]]
+		if (n < 0)
+			[[unlikely]]
 	{
 		return *this + (-n);
 	}
 
 
-	if (iterator_ == end)
-	[[unlikely]]
+		if (iterator_ == end)
+			[[unlikely]]
 	{
 		iterator_ = proxy_->buffer->prev;
 		--n;
@@ -1239,27 +1226,26 @@ namespace std
 		lhs.swap(rhs);
 	}
 
-	// template <typename T>
-	// void sort(typename CircularBuffer<T>::iterator& begin, typename CircularBuffer<T>::iterator& end,
-	// 		  std::function<bool(const typename CircularBuffer<T>::iterator&,
-	// 							 const typename CircularBuffer<T>::iterator&)>  =
-	// 			  std::less<T>())
-	// {
-	// }
+	template <typename T>
+	void sort(typename CircularBuffer<T>::iterator& begin, typename CircularBuffer<T>::iterator& end,
+			  std::function<bool(const typename CircularBuffer<T>::iterator&,
+								 const typename CircularBuffer<T>::iterator&)>  =
+				  std::less<T>())
+	{
+	}
 }
 
 
 #pragma endregion
 
-#endif // !CIRCULAR_BUFFER
 
 
-#ifndef CIRCULAR_BUFFER_ADAPTORS
+#pragma region CIRCULAR_BUFFER_ADAPTORS
 // Fixed capacity
 template <std::copyable T, size_t Capacity, class Alloc = std::allocator<T>>
 class FixedCircularBuffer
 {
-	CircularBuffer<T, Alloc> innerContainer_{Capacity};
+	CircularBuffer<T, Alloc> innerContainer_{ Capacity };
 
 public:
 	constexpr FixedCircularBuffer() = default;
@@ -1269,7 +1255,7 @@ public:
 template <std::copyable T, size_t Capacity, class Alloc = std::allocator<T>>
 class UniqueCircularBuffer
 {
-	CircularBuffer<T, Alloc> innerContainer_{Capacity};
+	CircularBuffer<T, Alloc> innerContainer_{ Capacity };
 
 public:
 	constexpr UniqueCircularBuffer() = default;
@@ -1279,8 +1265,8 @@ public:
 template <std::copyable T, size_t Capacity, class Alloc = std::allocator<T>>
 class SafeCircleBuffer
 {
-	CircularBuffer<T, Alloc> innerContainer_{Capacity};
+	CircularBuffer<T, Alloc> innerContainer_{ Capacity };
 public:
 	constexpr SafeCircleBuffer() = default;
 };
-#endif
+#pragma endregion

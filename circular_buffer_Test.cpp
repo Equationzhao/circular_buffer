@@ -1,15 +1,13 @@
-// #include <gtest/gtest.h>
 #include "circular_buffer.h"
 #include <algorithm>
 #include <chrono>
-#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-
-
+#include <fast_io/fast_io.h>
+// import Circular_Buffer;
 constexpr int N = 10;
 
 
@@ -108,6 +106,16 @@ struct data
 		delete b;
 		++dtimes;
 	}
+
+	auto operator<=>(const data& other) const
+	{
+		return this->c <=> other.c;
+	}
+
+	auto operator ==(const data& rhs) const
+	{
+		return this->c == rhs.c;
+	}
 };
 
 int main()
@@ -116,51 +124,16 @@ int main()
 	const auto start = std::chrono::high_resolution_clock::now();
 
 	{
-		CircularBuffer<data> buffer(N), buffer2(2 * N);
+		CircularBuffer<data> buffer(N);
+		CircularBuffer<data> buffer2(2 * N);
 
-
-		// assert(buffer.end() - 1 + 1 == buffer.end());
-		// assert(buffer.end() == buffer.begin()+buffer.capacity());
-
-		CircularBuffer<data>::circular_iterator it(buffer.circular_begin());
-		for (size_t i = 0, size = buffer.capacity(); i < 10 * size; ++i)
-		{
-			// std::cout << it->c;
-			--it;
-		}
-
-		// for (const auto& i : buffer2)
-		// {
-		// 	std::cout << i.c << '\n';
-		// }
-
-		//
-		//
-		// for (const auto& i : buffer)
-		// {
-		// 	std::cout << i.c << '\n';
-		// }
-		//
-		//
-		// buffer.swap(buffer);
-		//
-		// for (const auto& i : buffer)
-		// {
-		// 	std::cout << i.c << '\n';
-		// }
-		// std::swap(buffer,buffer2 );
+		print(std::ranges::any_of(buffer, [](const data& i) { return i.c == 5; }));
+		// a.sort();
+		// print(std::begin(buffer)->c);
 		// std::sort(buffer.begin(), buffer.end());
-
-
-		// for (auto&& i : buffer)
-		// {
-		// 	std::cout << i.c << '\n';
-		// }
 	}
 
 	const auto end = std::chrono::high_resolution_clock::now();
 
-	std::cout << "costing time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-		<< "ms\n";
-	std::cout << ctimes << "\n" << dtimes << "\n";
+	print("costing time: ", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), "ms\n");
 }
