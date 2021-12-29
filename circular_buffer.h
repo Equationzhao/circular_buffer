@@ -15,19 +15,22 @@
 
 
 #pragma region Includes
-#include <cassert>;
-#include <concepts>;
-#include <cstddef>;
-#include <functional>;
-#include <iterator>;
-#include <new>;
-#include <stdexcept>;
-#include <utility>;
+#include <cassert>
+#include <concepts>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <new>
+#include <stdexcept>
+#include <utility>
 
 #pragma endregion
 
 template <typename T>
-using observer_ptr = T*;
+using raw_ptr = T*;
+
+template <typename T>
+using observer_ptr = raw_ptr<T>;
 
 template <typename T>
 constexpr auto make_observer(T& obj)
@@ -35,24 +38,27 @@ constexpr auto make_observer(T& obj)
 	return std::addressof(obj);
 }
 
+template <typename T>
+constexpr observer_ptr<T> make_observer(T* obj)
+{
+	return obj;
+}
 
-// template<typename T, class Allocator = std::allocator<T>>
+
 template <std::copyable T, class Alloc = std::allocator<T>>
 /*
 	TODO(Equationzhao):
-		* refactor size_t in operator +,-,+=,-= of iterator
 		* Add concept Support
 		* Add constexpr support
 		* Add user-defined comparator support
 		* Add user-defined deleter support
-		* Use placement new instead of new expression
 		? Module support
-		? allocator support
-		? ranges support
 */
 class CircularBuffer
 {
 private:
+	inline static Alloc alloc_{};
+
 	/**
 	 * @brief Node
 	 *		contains the data
@@ -60,98 +66,166 @@ private:
 	 */
 	class Node
 	{
+	private:
+		constexpr static auto one{1};
 	public:
+		using self = Node;
 		using value_type = T;
 #pragma region data and pointer
-		value_type data{};
-		observer_ptr<Node> next{nullptr};
-		observer_ptr<Node> prev{nullptr};
-		observer_ptr<Node> head{nullptr};
+		raw_ptr<value_type> data{nullptr};
+		observer_ptr<self> next{nullptr};
+		observer_ptr<self> prev{nullptr};
+		observer_ptr<self> head{nullptr};
 		size_t distance{0};
-		//TODO(Equationzhao) refactor :use distance,
 		// ? is the variable head still necessary ?
 #pragma endregion
 
 #pragma region Constructors && Destructor
 
-		constexpr explicit Node(const T& data) : data(data)
+		constexpr explicit Node(const value_type& data)
 		{
+			make_obj(data);
 		}
 
-		constexpr explicit Node(T&& data) : data(std::move(data))
+		constexpr explicit Node(value_type&& data)
 		{
+			make_obj(std::move(data));
 		}
 
-		constexpr Node() = default;
+		constexpr Node()
+		{
+			make_obj();
+		}
 
-		constexpr Node(const Node& other) : data(other.data), next(other.next), prev(other.prev),
+		template <typename ...U>
+		explicit constexpr Node(U&&... u)
+		{
+			make_obj(u...);
+		}
+
+		constexpr Node(const Node& other) : next(other.next), prev(other.prev), head(other.head),
 											distance(other.distance)
 		{
+			make_obj(other.data);
 		}
 
-		constexpr Node(Node&& other) noexcept: data(std::move(other.data)), next(other.next), prev(other.prev),
+		constexpr Node(Node&& other) noexcept: next(other.next), prev(other.prev), head(other.head),
 											   distance(other.distance)
+
 		{
+			make_obj(std::exchange(other.data, nullptr));
 		}
 
 		constexpr Node& operator=(const Node& other)
 		{
-			data = (other.data);
-			next = (other.next);
-			prev = (other.prev);
-			distance = (other.distance);
+			if (this == std::addressof(other))
+			{
+				return *this;
+			}
+			*data = *other.data;
+			next = other.next;
+			prev = other.prev;
+			distance = other.distance;
+			head = other.head;
+
 			return *this;
 		}
 
 		constexpr Node& operator=(Node&& other) noexcept
 		{
-			data = std::move(other.data);
-			next = (other.next);
-			prev = (other.prev);
-			distance = (other.distance);
+			data = std::exchange(other.data, nullptr);
+			next = other.next;
+			prev = other.prev;
+			distance = other.distance;
+			head = other.head;
+
 			return *this;
 		}
 
-		constexpr virtual ~Node() = default;
+		constexpr auto make_obj()
+		{
+			data = alloc_.allocate(one);
+			std::construct_at(data);
+		}
 
-		// ? compare the T data it contains
-		//		or
-		//	 test `are they actually the same object`
+		template <typename ...U>
+		constexpr auto make_obj(U&&... u)
+		{
+			data = alloc_.allocate(one);
+			std::construct_at(data, std::forward<value_type>(u)...);
+		}
+
+		constexpr auto make_obj(const value_type& obj)
+		{
+			data = alloc_.allocate(one);
+			std::construct_at(data, obj);
+		}
+
+		constexpr auto make_obj(value_type&& obj)
+		{
+			data = alloc_.allocate(one);
+			std::construct_at(data, std::move(obj));
+		}
+
+		constexpr auto destroy_obj() noexcept
+		{
+			if (data != nullptr)
+			{
+				std::destroy_at(data);
+			}
+			alloc_.deallocate(data, 1);
+		}
+
+		constexpr virtual ~Node()
+		{
+			destroy_obj();
+		}
+
+		// ? TODO compare the T data it contains
+		// or  test `are they actually the same object`
 		constexpr bool operator==(const Node& rhs) const
 		{
-			return this->data == rhs.data;
+			return *(this->data) == *(rhs.data);
 		}
 
 		constexpr auto operator<=>(const Node& rhs) const
 		{
-			return this->data <=> rhs.data;
+			return *(this->data) <=> *(rhs.data);
 		}
+
+		constexpr auto swap(Node& other) noexcept
+		{
+			const auto temp = other;
+			other = *this;
+			*this = temp;
+		}
+
 #pragma endregion
 
 #pragma region Modifiers
 		/*
 		 * @brief write data
 		 */
-		auto write(const T& dataToWrite)
-		{
-			this->data = dataToWrite;
-		}
+		// auto write(const value_type& dataToWrite)
+		// {
+		// 	this->data = make_obj(dataToWrite);
+		// }
 
 		/*
 		 * @brief write data
 		 */
-		auto write(T&& dataToWrite)
+		auto write(value_type&& dataToWrite)
 		{
-			this->data = std::move(dataToWrite);
+			make_obj(dataToWrite);
 		}
 
 		/*
 		 * @brief get a copy of the data
 		 * @return value
 		 */
-		[[nodiscard]] T read() const
+		[[nodiscard]] value_type read() const
 		{
-			return this->data;
+			return *(this->data);
 		}
 
 
@@ -159,18 +233,18 @@ private:
 		 * @brief  get Reference of the data
 		 * @return reference
 		 */
-		[[nodiscard]] T& get()
+		[[nodiscard]] value_type& get() noexcept
 		{
-			return this->data;
+			return *(this->data);
 		}
 
 		/**
 		 * @brief  get Reference of the data
 		 * @return reference
 		 */
-		[[nodiscard]] T& get() const
+		[[nodiscard]] value_type& get() const
 		{
-			return this->data;
+			return *(this->data);
 		}
 
 
@@ -178,16 +252,22 @@ private:
 		 * @brief  get const-reference of the data
 		 * @return  const reference
 		 */
-		[[nodiscard]] const T& const_get() const
+		[[nodiscard]] const value_type& const_get() const
 		{
-			return this->data;
+			return *(this->data);
 		}
 
 
 #pragma endregion
 	};
 
-	observer_ptr<Node> buffer;
+private:
+	static void exchange(Node& lhs, Node& rhs)
+	{
+	}
+
+public:
+	raw_ptr<Node> buffer_{nullptr};
 	size_t capacity_{0};
 	size_t size_{0};
 
@@ -207,10 +287,10 @@ private:
 
 #pragma region initialize buffer
 		// create buffer
-		buffer = new Node();
-		observer_ptr<Node> iterator_ = buffer;
+		buffer_ = new Node();
+		observer_ptr<Node> iterator_ = make_observer(buffer_);
 
-		iterator_->head = buffer;
+		iterator_->head = buffer_;
 
 
 		// create nodes and link them
@@ -224,18 +304,38 @@ private:
 			iterator_->next->prev = iterator_;
 			iterator_ = iterator_->next;
 			iterator_->distance = ++distance;
-			iterator_->head = buffer;
+			iterator_->head = buffer_;
 		}
 
 		// make it circular
-		iterator_->next = buffer;
-		buffer->prev = iterator_;
+		iterator_->next = make_observer(buffer_);
+		buffer_->prev = make_observer(iterator_);
 
-		toWrite = buffer;
-		toRead = buffer;
+		toWrite = make_observer(buffer_);
+		toRead = make_observer(buffer_);
 
 #pragma endregion
 	}
+
+	//////////////////////////////////////////////////////////
+	// auto deleter_(observer_ptr<Node> node)				//
+	// {													//
+	// 	if (node == this->buffer_)							//
+	// 	{													//
+	// 		delete node;									//
+	// 		return;											//
+	// 	}				"Thank you, StackOverFlow"			//
+	//														//
+	// 		auto prev = node->prev;							//
+	// 		delete prev->next;								//
+	// 		return deleter_(prev);							//
+	// }													//
+	//														//
+	// void recursivelyDelete(observer_ptr<Node> node)		//
+	// {													//
+	// 		deleter_(node);									//
+	// }													//
+	//////////////////////////////////////////////////////////
 
 	/**
 	 * @brief destroy the circular buffer
@@ -248,47 +348,21 @@ private:
 		 *  Then go back to the previous node and delete `next` until the head node is reached
 		 */
 
-		if (buffer == nullptr)
+		if (buffer_ == nullptr)
 		{
 			return;
 		}
 
-		auto iterator_ = buffer;
-
-		//* Recursively delete
-		//! need Test!
-		//BUG: StackOverFlow
-		const auto deleterBack = [this](observer_ptr<Node> node)
+		auto iterator_ = this->buffer_->prev;
+		for (size_t i = 0; i < capacity_; ++i)
 		{
-			auto head_ = this;
-			static std::function<void(observer_ptr<Node>)> deleter_;
-			deleter_ = [&head_](observer_ptr<Node> node)
+			if (iterator_ == buffer_)
 			{
-				if (node == head_->buffer)
-				{
-					delete node;
-					return;
-				}
-
-				auto prev = node->prev;
-				delete prev->next;
-				return deleter_(prev);
-			};
-
-			deleter_(node);
-		};
-
-
-		// Find the last one
-		if (iterator_->next != nullptr)
-		{
-			while (iterator_->next != buffer)
-			{
-				iterator_ = iterator_->next;
+				delete iterator_;
+				return;
 			}
-
-			// Go back to the previous node and delete `next`
-			deleterBack(iterator_);
+			iterator_ = iterator_->prev;
+			delete iterator_->next;
 		}
 	}
 
@@ -306,32 +380,32 @@ private:
 
 	[[nodiscard]] auto getHeadElement()
 	{
-		return buffer->get();
+		return buffer_->get();
 	}
 
 	[[nodiscard]] auto getTailElement()
 	{
-		return buffer->prev->get();
+		return buffer_->prev->get();
 	}
 
 	[[nodiscard]] auto getHeadElement() const
 	{
-		return buffer->const_get();
+		return buffer_->const_get();
 	}
 
 	[[nodiscard]] auto getTailElement() const
 	{
-		return buffer->prev->const_get();
+		return buffer_->prev->const_get();
 	}
 
 	[[nodiscard]] auto getPtrHead_()
 	{
-		return std::addressof(buffer->data);
+		return std::addressof(buffer_->data);
 	}
 
 	[[nodiscard]] auto getPtrTail_()
 	{
-		return std::addressof(buffer->prev->data);
+		return std::addressof(buffer_->prev->data);
 	}
 
 
@@ -353,10 +427,10 @@ public:
 		using pointer = observer_ptr<T>;
 		using reference = T&;
 		using self = iterator;
-		using const_pointer = const observer_ptr<value_type>;
-		using const_reference = const value_type&;
-		using container_ptr = CircularBuffer*;
-		using const_container_ptr = const CircularBuffer*;
+		using const_pointer = const observer_ptr<T>;
+		using const_reference = const T&;
+		using container_ptr = observer_ptr<CircularBuffer>;
+		using const_container_ptr = const observer_ptr<CircularBuffer>;
 	private:
 		observer_ptr<value_type> ptr_;
 		const_container_ptr proxy_;
@@ -364,7 +438,7 @@ public:
 		auto clone(const iterator& other)
 		{
 			ptr_ = other.ptr_;
-			proxy_ = other.proxy_;
+			const_cast<container_ptr&>(proxy_) = other.proxy_;
 		}
 
 	protected:
@@ -375,7 +449,7 @@ public:
 
 
 	public:
-		constexpr inline static observer_ptr<Node> end{nullptr};
+		static constexpr observer_ptr<Node> end{nullptr};
 
 
 		iterator() : ptr_(nullptr), proxy_(nullptr)
@@ -501,12 +575,12 @@ public:
 		// When it's begin(), -- will call abort
 		constexpr self& operator--()
 		{
-			assert(this->ptr_ == proxy_->buffer);
-
+			assert(this->ptr_ == proxy_->buffer_);
 			if (this->ptr_ == end)
 			[[unlikely]]
 			{
-				this->ptr_ = proxy_->buffer->prev;
+				this->ptr_ = proxy_->buffer_->prev;
+				return *this;
 			}
 
 
@@ -624,8 +698,8 @@ public:
 		using pointer = observer_ptr<T>;
 		using reference = T&;
 		using self = circular_iterator;
-		using const_pointer = const observer_ptr<value_type>;
-		using const_reference = const value_type&;
+		using const_pointer = const observer_ptr<T>;
+		using const_reference = const T&;
 		using container_ptr = CircularBuffer*;
 		using const_container_ptr = const CircularBuffer*;
 
@@ -633,10 +707,10 @@ public:
 		observer_ptr<value_type> ptr_;
 		const_container_ptr proxy_;
 
-		constexpr auto clone(const iterator& other)
+		auto clone(const iterator& other)
 		{
 			ptr_ = other.ptr_;
-			proxy_ = other.proxy_;
+			const_cast<container_ptr&>(proxy_) = other.proxy_;
 		}
 
 	protected:
@@ -842,6 +916,17 @@ public:
 
 		constexpr virtual ~circular_iterator() = default;
 	};
+
+	/**
+	 * @brief reversed iterator
+	 *  TODO(Equationzhao)
+	 */
+	class reverse_iterator
+	{
+	public:
+	};
+
+
 #pragma endregion
 
 #pragma region Constructor && Descructor
@@ -879,37 +964,37 @@ public:
 
 	[[nodiscard]] constexpr T& front()
 	{
-		return buffer->get();
+		return buffer_->get();
 	}
 
 	[[nodiscard]] constexpr T& front() const
 	{
-		return buffer->const_get();
+		return buffer_->const_get();
 	}
 
 	[[nodiscard]] constexpr const T& cfront() const
 	{
-		return buffer->const_get();
+		return buffer_->const_get();
 	}
 
 	[[nodiscard]] constexpr T& back()
 	{
-		return buffer->prev->get();
+		return buffer_->prev->get();
 	}
 
 	[[nodiscard]] constexpr T& back() const
 	{
-		return buffer->prev->const_get();
+		return buffer_->prev->const_get();
 	}
 
 	[[nodiscard]] constexpr const T& cback() const
 	{
-		return buffer->prev->const_get();
+		return buffer_->prev->const_get();
 	}
 
 	[[nodiscard]] constexpr T& operator[](const size_t index) noexcept
 	{
-		auto iterator_ = buffer;
+		auto iterator_ = buffer_;
 
 		for (size_t i = 0; i < index; ++i)
 		{
@@ -955,8 +1040,11 @@ public:
 		// not Implement yet
 	}
 
-	constexpr auto emplace()
+	template <typename ...U>
+	constexpr auto emplace(const typename CircularBuffer<T>::iterator where, U&& ...u)
 	{
+		auto nodePtr = where->ptr_;
+		nodePtr->write(u...);
 		// not Implement yet
 	}
 
@@ -998,9 +1086,9 @@ public:
 		}
 
 		{
-			auto temp = this->buffer;
-			this->buffer = rhs.buffer;
-			rhs.buffer = temp;
+			auto temp = this->buffer_;
+			this->buffer_ = rhs.buffer_;
+			rhs.buffer_ = temp;
 		}
 
 		{
@@ -1034,7 +1122,7 @@ public:
 	 */
 	constexpr auto reverse()
 	{
-		auto iterator_ = buffer;
+		auto iterator_ = buffer_;
 
 		//* exchange the next and prev pointer
 		for (size_t i = 0; i < capacity_; ++i)
@@ -1066,14 +1154,14 @@ public:
 		Since it's a circle, the begin() and the end() is actually the same element.
 		But in order to support range-based-for, the end iterator is designed to be a nullptr
 		to access the what the `end` contains will call abort
-		operator like prefix++/--,suffix++/--,+=,-= is also **illegal** for the `end` !
+		operator like prefix++/--,suffix++/--,+=,-= is also **illegal** for the `end` ! 
 	 *
 	 */
 
 
 	[[nodiscard]] constexpr iterator begin()
 	{
-		return iterator(buffer, this);
+		return iterator(buffer_, this);
 	}
 
 	[[nodiscard]] constexpr iterator end()
@@ -1085,12 +1173,12 @@ public:
 
 	[[nodiscard]] constexpr const_iterator cbegin() const
 	{
-		return const_iterator(iterator::end, this);// TODO
+		return const_iterator(iterator::end, this); // TODO
 	}
 
 	[[nodiscard]] constexpr const_iterator cend() const
 	{
-		return const_iterator(iterator::end, this);// TODO
+		return const_iterator(iterator::end, this); // TODO
 	}
 
 
@@ -1099,14 +1187,14 @@ public:
 
 	[[nodiscard]] circular_iterator circular_begin() const
 	{
-		return circular_iterator(buffer, this);
+		return circular_iterator(buffer_, this);
 	}
 
 	using const_circular_iterator = circular_iterator;
 
 	[[nodiscard]] const_circular_iterator circular_cbegin() const
 	{
-		return const_circular_iterator(buffer, this);
+		return const_circular_iterator(buffer_, this);
 	}
 
 
@@ -1131,7 +1219,6 @@ public:
 					return false;
 				}
 			}
-
 
 			return true;
 		}
@@ -1181,12 +1268,13 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 
 	for (size_t i = 0; i < t; ++i)
 	{
-		if (iterator_ == iterator_->head->prev)
+		if (iterator_ == proxy_->buffer_->prev)
 		[[unlikely]]
 		{
 			iterator_ = end;
 		}
 		else
+		[[likely]]
 		{
 			iterator_ = iterator_->next;
 		}
@@ -1217,14 +1305,14 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	if (iterator_ == end)
 	[[unlikely]]
 	{
-		iterator_ = proxy_->buffer->prev;
+		iterator_ = proxy_->buffer_->prev;
 		--n;
 	}
 
 
 	for (difference_type i = 0; i < n; ++i)
 	{
-		assert(iterator_ == proxy_->buffer);
+		assert(iterator_ == proxy_->buffer_);
 		iterator_ = iterator_->prev;
 	}
 
@@ -1239,14 +1327,14 @@ namespace std
 		lhs.swap(rhs);
 	}
 
-	// template <typename T>
-	// void sort(typename CircularBuffer<T>::iterator& begin, typename CircularBuffer<T>::iterator& end,
-	// 		  std::function<bool(const typename CircularBuffer<T>::iterator&,
-	// 							 const typename CircularBuffer<T>::iterator&)>  =
-	// 			  std::less<T>())
-	// {
-	// }
-}
+	template <typename T>
+	void sort(typename CircularBuffer<T>::iterator& begin, typename CircularBuffer<T>::iterator& end,
+			  std::function<bool(const typename CircularBuffer<T>::iterator&,
+								 const typename CircularBuffer<T>::iterator&)>  =
+				  std::less<T>())
+	{
+	}
+} // namespace std
 
 
 #pragma endregion
