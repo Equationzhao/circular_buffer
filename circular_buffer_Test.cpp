@@ -22,43 +22,56 @@ constexpr auto make_obj(U&& ... t)
 	return T(std::forward<U>(t)...);
 }
 
+
+struct data
+{
+	int x;
+	inline static int time{0};
+
+	data() : x(0)
+	{
+		++time;
+	}
+
+	data(int x): x(x)
+	{
+		++time;
+	}
+
+	data(const data& other): x(other.x)
+	{
+		++time;
+	}
+};
+
+
 int main()
 {
 	// accurate timer
-	const auto start = std::chrono::high_resolution_clock::now();
-
+	srand(time(nullptr));
 	{
-		CircularBuffer<int> buffer{100};
+		CircularBuffer<data> u(10);
+		const auto start = std::chrono::high_resolution_clock::now();
 
-		std::ranges::fill(buffer, 10000);
-
-		std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<int>(std::cout, "\n "));
-
-		print("////////////////////////////////////////////////");
-
-		int i{};
-		std::ranges::generate(buffer, [&i] { return 2 * ++i; });
-
-		for (int data : buffer)
+		const auto times = rand();
+		for (size_t i = 0; i < times; ++i)
 		{
-			println(data);
+			u.insert(u.begin().operator++(), rand() % (1 + rand()));
 		}
 
-
-		print("////////////////////////////////////////////////");
-
-
-		std::reverse(buffer.begin(), buffer.end()); // BUG
-
-
-		for (int data : buffer)
+		const auto end = std::chrono::high_resolution_clock::now();
+		// println(u[5]);
+		println("");
+		for (const auto& d : u)
 		{
-			println(data);
+			println(d.x);
 		}
+
+		println("insert ", times, " times");
+
+		println("costing time: ", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), "ms\n");
+		// println(data::time);
 	}
 
-	const auto end = std::chrono::high_resolution_clock::now();
-
-	print("costing time: ", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), "ms\n");
-	print("ctime: ", ctimes, "\n", "dtime: ", dtimes);
+	println("ctime: ", ctimes, "\n", "dtime: ", dtimes);
 }

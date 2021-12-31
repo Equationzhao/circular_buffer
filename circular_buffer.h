@@ -30,7 +30,7 @@ template <typename T>
 using raw_ptr = T*;
 
 template <typename T>
-using observer_ptr = raw_ptr<T>;
+using observer_ptr = raw_ptr<T>; // to const?
 
 template <typename T>
 constexpr auto make_observer(T& obj)
@@ -57,8 +57,6 @@ template <std::copyable T, class Alloc = std::allocator<T>>
 class CircularBuffer
 {
 private:
-	inline static Alloc alloc_{};
-
 	/**
 	 * @brief Node
 	 *		contains the data
@@ -75,41 +73,40 @@ private:
 		raw_ptr<value_type> data{nullptr};
 		observer_ptr<self> next{nullptr};
 		observer_ptr<self> prev{nullptr};
-		observer_ptr<self> head{nullptr};
+
 		size_t distance{0};
-		// ? is the variable head still necessary ?
 #pragma endregion
 
 #pragma region Constructors && Destructor
 
-		constexpr explicit Node(const value_type& data)
+		// constexpr explicit Node(const value_type& data)
+		// {
+		// 	make_obj(data);
+		// }
+		//
+		// constexpr explicit Node(value_type&& data)
+		// {
+		// 	make_obj(std::move(data));
+		// }
+
+		// constexpr Node()
+		// {
+		// 	make_obj();
+		// }
+
+		template <typename ...Args>
+		explicit constexpr Node(Args&&... args)
 		{
-			make_obj(data);
+			make_obj(std::forward<Args>(args)...);
 		}
 
-		constexpr explicit Node(value_type&& data)
-		{
-			make_obj(std::move(data));
-		}
-
-		constexpr Node()
-		{
-			make_obj();
-		}
-
-		template <typename ...U>
-		explicit constexpr Node(U&&... u)
-		{
-			make_obj(u...);
-		}
-
-		constexpr Node(const Node& other) : next(other.next), prev(other.prev), head(other.head),
+		constexpr Node(const Node& other) : next(other.next), prev(other.prev),
 											distance(other.distance)
 		{
 			make_obj(other.data);
 		}
 
-		constexpr Node(Node&& other) noexcept: next(other.next), prev(other.prev), head(other.head),
+		constexpr Node(Node&& other) noexcept: next(other.next), prev(other.prev),
 											   distance(other.distance)
 
 		{
@@ -126,7 +123,6 @@ private:
 			next = other.next;
 			prev = other.prev;
 			distance = other.distance;
-			head = other.head;
 
 			return *this;
 		}
@@ -137,35 +133,34 @@ private:
 			next = other.next;
 			prev = other.prev;
 			distance = other.distance;
-			head = other.head;
 
 			return *this;
 		}
 
-		constexpr auto make_obj()
+		// constexpr auto make_obj()
+		// {
+		// 	data = alloc_.allocate(one);
+		// 	std::construct_at(data);
+		// }
+
+		template <typename ... Args>
+		constexpr auto make_obj(Args&&... args)
 		{
 			data = alloc_.allocate(one);
-			std::construct_at(data);
+			std::construct_at(data, std::forward<Args>(args)...);
 		}
 
-		template <typename ...U>
-		constexpr auto make_obj(U&&... u)
-		{
-			data = alloc_.allocate(one);
-			std::construct_at(data, std::forward<value_type>(u)...);
-		}
+		// constexpr auto make_obj(const value_type& obj)
+		// {
+		// 	data = alloc_.allocate(one);
+		// 	std::construct_at(data, obj);
+		// }
 
-		constexpr auto make_obj(const value_type& obj)
-		{
-			data = alloc_.allocate(one);
-			std::construct_at(data, obj);
-		}
-
-		constexpr auto make_obj(value_type&& obj)
-		{
-			data = alloc_.allocate(one);
-			std::construct_at(data, std::move(obj));
-		}
+		// constexpr auto make_obj(value_type&& obj)
+		// {
+		// 	data = alloc_.allocate(one);
+		// 	std::construct_at(data, std::move(obj));
+		// }
 
 		constexpr auto destroy_obj() noexcept
 		{
@@ -214,9 +209,10 @@ private:
 		/*
 		 * @brief write data
 		 */
-		auto write(value_type&& dataToWrite)
+		template <typename ...Args>
+		auto write(Args&& ...dataToWrite)
 		{
-			make_obj(dataToWrite);
+			make_obj(std::forward<Args>(dataToWrite)...);
 		}
 
 		/*
@@ -261,12 +257,184 @@ private:
 #pragma endregion
 	};
 
-private:
-	static void exchange(Node& lhs, Node& rhs)
+
+	/*
+	 * @exchange the contained value
+	 *	attention to self-assign
+	 */
+	static void exchangeNode(raw_ptr<Node> lhs, raw_ptr<Node> rhs)
 	{
+		if (lhs == rhs)
+		[[unlikely]]
+		{
+			return;
+		}
+
+		std::swap(lhs->data, rhs->data);
 	}
 
-public:
+
+	/*
+	 * @brief if index <= capacity/2 go forward
+	 *		  else go backward
+	 */
+	raw_ptr<Node> findNode(const size_t index)
+	{
+		if (index == 0)
+		[[unlikely]]
+		{
+			return buffer_;
+		}
+		assert(index < capacity_);
+		auto iterator_ = make_observer(buffer_);
+
+		if (index <= capacity_ / 2) // forward
+		{
+			for (size_t i = 0; i < index; ++i)
+			{
+				iterator_ = iterator_->next;
+			}
+		}
+		else // backward
+		{
+			for (size_t i = 0; i < capacity_ - index; ++i)
+			{
+				iterator_ = iterator_->prev;
+			}
+		}
+
+		return iterator_;
+	}
+
+
+	/*
+	 *@brief
+	 *	Before insert
+	 *		...->a->where->...
+	 *	After  insert
+	 *		...->a->toInsert->where->...
+	 *
+	 *
+	 *	//TODO FIXME update distance
+	 */
+	void insertNode(raw_ptr<Node> where, raw_ptr<Node> toInsert)
+	{
+		auto& prePtr = where->prev;
+		auto& prev = *(where->prev);
+
+
+		prePtr = toInsert;
+		toInsert->next = make_observer(where);
+
+
+		prev.next = make_observer(toInsert);
+		toInsert->prev = make_observer(prev);
+
+
+		toInsert->distance = 1 + prev.distance;
+		auto iterator_ = toInsert->next;
+
+		do
+		{
+			++iterator_->distance;
+			iterator_ = iterator_->next;
+		}
+		while (iterator_ != buffer_);
+
+		++capacity_;
+	}
+
+	/*
+	 * @brief insert between where and where->next
+	 */
+	void insertNodeAfter(raw_ptr<Node> where, raw_ptr<Node> toInsert)
+	{
+		auto& nextPtr = where->next;
+		auto& next = *(where->next);
+
+
+		nextPtr = toInsert;
+		toInsert->prev = make_observer(where);
+
+
+		next.prev = make_observer(toInsert);
+		toInsert->next = make_observer(next);
+
+
+		toInsert->distance = 1 + where->distance;
+		auto iterator_ = toInsert->next;
+
+		while (iterator_ != buffer_)
+		{
+			++iterator_->distance;
+			iterator_ = iterator_->next;
+		}
+
+		++capacity_;
+	}
+
+
+	template <typename ...Args>
+	void insertNode(raw_ptr<Node> where, Args&& ...args)
+	{
+		auto toInsert = make_node(std::forward<Args>(args)...);
+		insertNode(where, toInsert);
+	}
+
+	template <typename ...Args>
+	void insertNodeAfter(raw_ptr<Node> where, Args&& ...args)
+	{
+		auto toInsert = make_node(std::forward<Args>(args)...);
+		insertNodeAfter(where, toInsert);
+	}
+
+
+	template <typename ...Args>
+	static raw_ptr<Node> make_node(Args&& ...args)
+	{
+		return std::construct_at(nodeAlloc_.allocate(1), std::forward<Args>(args)...);
+	}
+
+	/*
+	 * @brief destruct and
+	 *		free the memory
+	 */
+	auto destroyNode(raw_ptr<Node> which)
+	{
+		std::destroy_at(which);
+		nodeAlloc_.deallocate(which);
+	}
+
+
+	/*
+	 * @brief delete the node from the circle
+	 *		link the previous one and the next one
+	 *		the destroy the node
+	 */
+	void deleteNode(raw_ptr<Node> which)
+	{
+		auto& preNode = which->prev;
+		auto& nextNode = which->next;
+
+		preNode->next = make_observer(nextNode);
+		nextNode->prev = make_observer(preNode);
+
+		destroyNode(which);
+
+		auto iterator_ = nextNode;
+		do
+		{
+			--(iterator_->distance);
+			iterator_ = iterator_->next;
+		}
+		while (iterator_ != buffer_);
+	}
+
+
+	inline static Alloc alloc_{};
+	inline static std::allocator<Node> nodeAlloc_{};
+
+private:
 	raw_ptr<Node> buffer_{nullptr};
 	size_t capacity_{0};
 	size_t size_{0};
@@ -279,7 +447,7 @@ public:
 	 *
 	 * @param capacityToInit the capacity of the buffer
 	 */
-	constexpr void init(size_t capacityToInit)
+	constexpr void init(const size_t capacityToInit)
 	{
 		this->capacity_ = capacityToInit;
 		this->size_ = 0;
@@ -290,21 +458,18 @@ public:
 		buffer_ = new Node();
 		observer_ptr<Node> iterator_ = make_observer(buffer_);
 
-		iterator_->head = buffer_;
-
 
 		// create nodes and link them
-		// update head and distance
+		// update distance
 		size_t distance{0};
 		iterator_->distance = distance;
 
 		for (size_t i = 0; i < capacityToInit - 1; ++i)
 		{
-			iterator_->next = new Node();
+			iterator_->next = make_node();
 			iterator_->next->prev = iterator_;
 			iterator_ = iterator_->next;
 			iterator_->distance = ++distance;
-			iterator_->head = buffer_;
 		}
 
 		// make it circular
@@ -449,18 +614,17 @@ public:
 
 
 	public:
-		static constexpr observer_ptr<Node> end{nullptr};
-
+		friend class CircularBuffer;
 
 		iterator() : ptr_(nullptr), proxy_(nullptr)
 		{
 		}
 
-		explicit iterator(observer_ptr<value_type> ptr, const_container_ptr proxy) : ptr_(ptr), proxy_(proxy)
+		constexpr iterator(observer_ptr<value_type> ptr, const_container_ptr proxy) noexcept : ptr_(ptr), proxy_(proxy)
 		{
 		}
 
-		iterator(const iterator& other) : ptr_(other.ptr_), proxy_(other.proxy_)
+		constexpr iterator(const iterator& other) : ptr_(other.ptr_), proxy_(other.proxy_)
 		{
 		}
 
@@ -496,33 +660,33 @@ public:
 
 		constexpr reference operator*()
 		{
-			assert(this->ptr_ != end);
+			assert(this->ptr_ != nullptr);
 
 			return ptr_->get();
 		}
 
 		constexpr const_reference operator*() const
 		{
-			assert(this->ptr_ != end);
+			assert(this->ptr_ != nullptr);
 
 			return ptr_->const_get();
 		}
 
 		constexpr pointer operator->() const
 		{
-			assert(this->ptr_ != end);
+			assert(this->ptr_ != nullptr);
 
 			return std::addressof(ptr_->data);
 		}
 
 		constexpr self& operator++()
 		{
-			assert(ptr_ != end);
+			assert(ptr_ != nullptr);
 
-			if (ptr_ == ptr_->head->prev)
+			if (ptr_ == proxy_->buffer_->prev)
 			[[unlikely]]
 			{
-				ptr_ = end;
+				ptr_ = nullptr;
 			}
 			else
 			[[likely]]
@@ -550,7 +714,7 @@ public:
 		// ! need test
 		constexpr self& operator+=(difference_type n)
 		{
-			// assert(ptr_ != end);
+			// assert(ptr_ != nullptr);
 
 			if (n == 0)
 			[[unlikely]]
@@ -564,7 +728,7 @@ public:
 				return (*this -= -n);
 			}
 
-			for (size_t i = 0; i < n; ++i)
+			for (difference_type i = 0; i < n; ++i)
 			{
 				++(*this);
 			}
@@ -576,7 +740,7 @@ public:
 		constexpr self& operator--()
 		{
 			assert(this->ptr_ == proxy_->buffer_);
-			if (this->ptr_ == end)
+			if (this->ptr_ == nullptr)
 			[[unlikely]]
 			{
 				this->ptr_ = proxy_->buffer_->prev;
@@ -611,10 +775,10 @@ public:
 
 			const auto iterator_ = this->ptr_;
 
-			if (iterator_ == end)
+			if (iterator_ == nullptr)
 			[[unlikely]]
 			{
-				if (rhs.ptr_ == end)
+				if (rhs.ptr_ == nullptr)
 				[[unlikely]]
 				{
 					return 0;
@@ -626,7 +790,7 @@ public:
 				}
 			}
 
-			if (rhs.ptr_ == end)
+			if (rhs.ptr_ == nullptr)
 			[[unlikely]]
 			{
 				return iterator_->distance;
@@ -675,6 +839,9 @@ public:
 		}
 
 		// ! need test
+		/**
+		 * strong_ordering of ptr_->data
+		 */
 		constexpr auto operator<=>(const iterator& other) const
 		{
 			// iterator of different containers cannot be compared => abort
@@ -931,8 +1098,9 @@ public:
 
 #pragma region Constructor && Descructor
 
-	constexpr explicit CircularBuffer(size_t capacity_)
+	constexpr explicit CircularBuffer(const size_t capacity_)
 	{
+		assert(capacity_ != 0); // forbidden
 		init(capacity_);
 	}
 
@@ -952,7 +1120,7 @@ public:
 	*/
 	CircularBuffer(CircularBuffer&& other) = delete;
 
-	explicit CircularBuffer(const CircularBuffer& other) = delete;
+	CircularBuffer(const CircularBuffer& other) = delete;
 
 	CircularBuffer& operator=(const CircularBuffer& other) = delete;
 
@@ -1016,35 +1184,49 @@ public:
 
 		return this[index];
 	}
+
+	[[nodiscard]] auto get_allocator() const
+	{
+		return alloc_;
+	}
+
+	[[nodiscard]] Alloc& get_allocator()
+	{
+		return alloc_;
+	}
+
+
 #pragma endregion
 
 #pragma region Modifiers
 	// TODO(Equationzhao) implementation details
 	// Perfect forwarding
-	constexpr auto write(T&& data)
+	template <typename ...Args>
+	constexpr auto write(Args&& ...args)
 	{
-		toWrite->write(std::move(data));
+		toWrite->write(std::forward<Args>(args)...);
 		toWrite = toWrite->next;
 		// not Implement yet
 	}
 
 
-	constexpr auto write(const T& data)
+	template <typename ...Args>
+	constexpr auto insert(const iterator where, Args&& ...args)
 	{
-		toWrite->write(data);
-		toWrite = toWrite->next;
-	}
-
-	constexpr auto insert()
-	{
+		this->emplace(where, std::forward<Args>(args)...);
 		// not Implement yet
 	}
 
-	template <typename ...U>
-	constexpr auto emplace(const typename CircularBuffer<T>::iterator where, U&& ...u)
+	template <typename ... Args>
+	constexpr auto emplace(const iterator where, Args&& ...args)
 	{
-		auto nodePtr = where->ptr_;
-		nodePtr->write(u...);
+		assert(where != begin());
+
+		where.ptr_
+			? insertNode(where.ptr_, std::forward<Args>(args)...)
+			: insertNodeAfter(where.proxy_->buffer_->prev, std::forward<Args>(args)...);
+
+
 		// not Implement yet
 	}
 
@@ -1069,10 +1251,54 @@ public:
 		// not Implement yet
 	}
 
-	constexpr auto sort()
-	{
-		// not Implement yet
-	}
+	// constexpr auto merge(raw_ptr<Node> head1,size_t len1, raw_ptr<Node> head2,size_t len2)
+	// {
+	// 	Node* dummyHead = new Node();
+	// 	Node *temp = dummyHead, *temp1 = head1, *temp2 = head2;
+	// 	while (temp1 != nullptr && temp2 != nullptr)
+	// 	{
+	// 		if (temp1->val <= temp2->val)
+	// 		{
+	// 			temp->next = temp1;
+	// 			temp1 = temp1->next;
+	// 		}
+	// 		else
+	// 		{
+	// 			temp->next = temp2;
+	// 			temp2 = temp2->next;
+	// 		}
+	// 		temp = temp->next;
+	// 	}
+	// 	if (temp1 != nullptr)
+	// 	{
+	// 		temp->next = temp1;
+	// 	}
+	// 	else if (temp2 != nullptr)
+	// 	{
+	// 		temp->next = temp2;
+	// 	}
+	// 	raw_ptr<Node> res = 
+	// 	return dummyHead->next;
+	// }
+
+
+	// constexpr auto sort(raw_ptr<Node> begin, raw_ptr<Node> last,
+	// 					std::function<bool(const T&, const T&)> fn = std::less<T>())
+	// {
+	// 	assert(begin <= last);
+	//
+	//
+	//
+	// 	if (begin == last)
+	// 	{
+	// 		return;
+	// 	}
+	//
+	// 	raw_ptr<Node> mid = findNode((begin->distance + last->distance) / 2);
+	//
+	//
+	// 	return merge(sort(begin, mid), ,sort(mid, last),);
+	// }
 
 	/*
 	 * @brief swaps the pointer and data member
@@ -1166,19 +1392,19 @@ public:
 
 	[[nodiscard]] constexpr iterator end()
 	{
-		return iterator(iterator::end, this);
+		return iterator(nullptr, this);
 	}
 
 	using const_iterator = const iterator;
 
 	[[nodiscard]] constexpr const_iterator cbegin() const
 	{
-		return const_iterator(iterator::end, this); // TODO
+		return const_iterator(nullptr, this); // TODO
 	}
 
 	[[nodiscard]] constexpr const_iterator cend() const
 	{
-		return const_iterator(iterator::end, this); // TODO
+		return const_iterator(nullptr, this); // TODO
 	}
 
 
@@ -1259,7 +1485,7 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 		return *this - (-n);
 	}
 
-	assert(ptr_ != end);
+	assert(ptr_ != nullptr);
 
 	const auto t = n;
 
@@ -1271,7 +1497,7 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 		if (iterator_ == proxy_->buffer_->prev)
 		[[unlikely]]
 		{
-			iterator_ = end;
+			iterator_ = nullptr;
 		}
 		else
 		[[likely]]
@@ -1302,7 +1528,7 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	}
 
 
-	if (iterator_ == end)
+	if (iterator_ == nullptr)
 	[[unlikely]]
 	{
 		iterator_ = proxy_->buffer_->prev;
