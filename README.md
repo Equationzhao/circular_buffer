@@ -16,6 +16,7 @@
 
 ## Support Modifiers/Member access/Operators
 
+* insert/emplace
 * push (in process)
 * assign (in process)
 * write
