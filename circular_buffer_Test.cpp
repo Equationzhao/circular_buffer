@@ -45,33 +45,23 @@ struct data
 };
 
 
-int main()
+auto timer_ms(const std::function<void()> a)
 {
-	// accurate timer
-	srand(time(nullptr));
+	const auto start = std::chrono::high_resolution_clock::now();
+
+	a();
+
+	const auto end = std::chrono::high_resolution_clock::now();
+
+	return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+}
+
+
+int main(){
 	{
 		CircularBuffer<data> u(10);
-		const auto start = std::chrono::high_resolution_clock::now();
-
-		const auto times = rand();
-		for (size_t i = 0; i < times; ++i)
-		{
-			u.insert(u.begin().operator++(), rand() % (1 + rand()));
-		}
-
-		const auto end = std::chrono::high_resolution_clock::now();
-		// println(u[5]);
-		println("");
-		for (const auto& d : u)
-		{
-			println(d.x);
-		}
-
-		println("insert ", times, " times");
-
-		println("costing time: ", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), "ms\n");
-		// println(data::time);
+		auto i{0};
+		std::ranges::generate(u, [&i] { return ++i; });
+		println((*(std::begin(u) + 3)).x);
 	}
-
-	println("ctime: ", ctimes, "\n", "dtime: ", dtimes);
 }
