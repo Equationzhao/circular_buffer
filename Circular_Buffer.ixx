@@ -1206,17 +1206,146 @@ public:
 
 	CircularBuffer& operator=(const CircularBuffer& other) = delete;
 
-	CircularBuffer& operator=(CircularBuffer&&
+	CircularBuffer& operator=(CircularBuffer&& other) = delete;
+
+#pragma endregion
+
+#pragma region element access
+
+	[[nodiscard]] constexpr T& front()
+	{
+		return buffer_->get();
+	}
+
+	[[nodiscard]] constexpr T& front() const
+	{
+		return buffer_->const_get();
+	}
+
+	[[nodiscard]] constexpr const T& cfront() const
+	{
+		return buffer_->const_get();
+	}
+
+	[[nodiscard]] constexpr T& back()
+	{
+		return buffer_->prev->get();
+	}
+
+	[[nodiscard]] constexpr T& back() const
+	{
+		return buffer_->prev->const_get();
+	}
+
+	[[nodiscard]] constexpr const T& cback() const
+	{
+		return buffer_->prev->const_get();
+	}
+
+	[[nodiscard]] constexpr T& operator[](const size_t index) noexcept
+	{
+		auto iterator_ = buffer_;
+
+		for (size_t i = 0; i < index; ++i)
+		{
+			iterator_ = iterator_->next;
+		}
+
+		return iterator_->get();
+	}
+
+
+	// throws runtime_error
+	// not recommended
+	[[nodiscard]] T& at(const size_t index)
+	{
+		if (index > size())
+		{
+			throw std::runtime_error("");
+		}
+
+		return this[index];
+	}
+
+	[[nodiscard]] auto get_allocator() const
+	{
+		return alloc_;
+	}
+
+	[[nodiscard]] Alloc& get_allocator()
+	{
+		return alloc_;
+	}
+
+
+#pragma endregion
+
+#pragma region Modifiers
+
+	template <typename ...Args>
+	constexpr auto write(Args&& ...args)
+	{
+		toWrite->write(std::forward<Args>(args)...);
+		toWrite = toWrite->next;
+	}
+
+
+	template <typename ...Args>
+	constexpr auto insert(const iterator where, Args&& ...args)
+	{
+		this->emplace(where, std::forward<Args>(args)...);
+	}
+
+	template <typename ... Args>
+	constexpr auto emplace(const iterator where, Args&& ...args)
+	{
+		assert(where != begin());
+
+		where.ptr_
+		? insertNodeBefore(where.ptr_, std::forward<Args>(args)...)
+			: insertNodeAfter(where.proxy_->buffer_->prev, std::forward<Args>(args)...);
+	}
+
+	/*
+	 * @brief gets a copy of the data
+	 *
+	 * @return T
+	 */
+	constexpr auto read()
+	{
+		const auto& d = toRead->data;
+		toRead = toRead->next;
+		return d;
+		// not Implement yet
+	}
+
+	/*
 	 * TODO(Equationzhao) clear the memory
 	 */
 	constexpr auto clear()
 	{
+		clear(buffer_, buffer_->prev);
 		// not Implement yet
 	}
 
-	constexpr auto sort()
+
+	constexpr auto sort(raw_ptr<Node> begin, raw_ptr<Node> last,
+		const std::function<bool(const T&, const T&)>& fn = std::less<T>())
 	{
-		// not Implement yet
+		assert(begin <= last);
+
+
+		if (begin == last)
+		{
+			return;
+		}
+
+		raw_ptr<Node> mid = findNode((begin->distance + last->distance) / 2);
+
+
+		return mergeSortImpl(sort(begin, mid), mid->distance - begin->distance,
+			sort(mid, last), last->distance - mid->distance,
+			fn);
 	}
 
 	/*
@@ -1231,9 +1360,9 @@ public:
 		}
 
 		{
-			auto temp = this->buffer;
-			this->buffer = rhs.buffer;
-			rhs.buffer = temp;
+			auto temp = this->buffer_;
+			this->buffer_ = rhs.buffer_;
+			rhs.buffer_ = temp;
 		}
 
 		{
@@ -1267,20 +1396,59 @@ public:
 	 */
 	constexpr auto reverse()
 	{
-		auto iterator_ = buffer;
+		auto iterator_ = buffer_;
+		buffer_->distance = capacity_ - 1;
 
 		//* exchange the next and prev pointer
 		for (size_t i = 0; i < capacity_; ++i)
 		{
-			auto temp = iterator_->next;
-			iterator_->next = iterator_->prev;
-			iterator_->prev = temp;
+			auto temp = iterator_->prev;
+			iterator_->prev = iterator_->next;
+			iterator_->next = temp;
 			iterator_ = iterator_->next;
+			iterator_->distance = i;
 		}
+
+		buffer_ = buffer_->next; // it's next 
 	}
 
-	constexpr auto erase()
+
+	template <typename ...Args>
+	constexpr auto push_front(Args&& ...args)
 	{
+		insertNodeBefore(buffer_, std::forward<Args>(args)...);
+	}
+
+
+	template <typename ...Args>
+	constexpr auto push_back(Args&& ...args)
+	{
+		insertNodeAfter(buffer_->prev, std::forward<Args>(args)...);
+	}
+
+
+	constexpr auto pop_front()
+	{
+		buffer_ = buffer_->next;
+		deleteNode(buffer_->prev);
+	}
+
+	constexpr auto pop_back()
+	{
+		deleteNode(buffer_->prev);
+	}
+
+	constexpr auto erase(iterator begin, iterator end)
+	{
+		assert(begin.proxy_ == end.proxy_);
+		auto it = begin + 1;
+
+		do
+		{
+			deleteNode(it.ptr_->prev); // not tested
+		}
+		while (it != end);
+
 		// not Implement yet
 	}
 
@@ -1299,31 +1467,31 @@ public:
 		Since it's a circle, the begin() and the end() is actually the same element.
 		But in order to support range-based-for, the end iterator is designed to be a nullptr
 		to access the what the `end` contains will call abort
-		operator like prefix++/--,suffix++/--,+=,-= is legal for the `end`
+		operator like prefix++/--,suffix++/--,+=,-= is also **illegal** for the `end` !
 	 *
 	 */
 
 
 	[[nodiscard]] constexpr iterator begin()
 	{
-		return iterator(buffer, this);
+		return iterator(buffer_, this);
 	}
 
 	[[nodiscard]] constexpr iterator end()
 	{
-		return iterator(iterator::end, this);
+		return iterator(nullptr, this);
 	}
 
 	using const_iterator = const iterator;
 
 	[[nodiscard]] constexpr const_iterator cbegin() const
 	{
-		return const_iterator(iterator::end, this);
+		return const_iterator(nullptr, this); // TODO
 	}
 
 	[[nodiscard]] constexpr const_iterator cend() const
 	{
-		return const_iterator(iterator::end, this);
+		return const_iterator(nullptr, this); // TODO
 	}
 
 
@@ -1332,14 +1500,14 @@ public:
 
 	[[nodiscard]] circular_iterator circular_begin() const
 	{
-		return circular_iterator(buffer, this);
+		return circular_iterator(buffer_, this);
 	}
 
 	using const_circular_iterator = circular_iterator;
 
 	[[nodiscard]] const_circular_iterator circular_cbegin() const
 	{
-		return const_circular_iterator(buffer, this);
+		return const_circular_iterator(buffer_, this);
 	}
 
 
@@ -1364,7 +1532,6 @@ public:
 					return false;
 				}
 			}
-
 
 			return true;
 		}
@@ -1405,7 +1572,7 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 		return *this - (-n);
 	}
 
-	assert(ptr_ != end);
+	assert(ptr_ != nullptr);
 
 	const auto t = n;
 
@@ -1414,12 +1581,13 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 
 	for (size_t i = 0; i < t; ++i)
 	{
-		if (iterator_ == iterator_->head->prev)
+		if (iterator_ == proxy_->buffer_->prev)
 			[[unlikely]]
 		{
-			iterator_ = end;
+			iterator_ = nullptr;
 		}
 		else
+			[[likely]]
 		{
 			iterator_ = iterator_->next;
 		}
@@ -1447,17 +1615,17 @@ constexpr typename CircularBuffer<T, Alloc>::iterator::self CircularBuffer<T, Al
 	}
 
 
-		if (iterator_ == end)
+		if (iterator_ == nullptr)
 			[[unlikely]]
 	{
-		iterator_ = proxy_->buffer->prev;
+		iterator_ = proxy_->buffer_->prev;
 		--n;
 	}
 
 
 	for (difference_type i = 0; i < n; ++i)
 	{
-		assert(iterator_ == proxy_->buffer);
+		assert(iterator_ == proxy_->buffer_);
 		iterator_ = iterator_->prev;
 	}
 
@@ -1474,19 +1642,21 @@ namespace std
 
 	template <typename T>
 	void sort(typename CircularBuffer<T>::iterator& begin, typename CircularBuffer<T>::iterator& end,
-			  std::function<bool(const typename CircularBuffer<T>::iterator&,
-								 const typename CircularBuffer<T>::iterator&)>  =
-				  std::less<T>())
+		std::function<bool(const typename CircularBuffer<T>::iterator&,
+			const typename CircularBuffer<T>::iterator&)> fn =
+		std::less<T>())
 	{
+		CircularBuffer<T>::sort(begin, end, fn);
 	}
-}
+} // namespace std
 
 
 #pragma endregion
 
+#endif // !CIRCULAR_BUFFER
 
 
-#pragma region CIRCULAR_BUFFER_ADAPTORS
+#ifndef CIRCULAR_BUFFER_ADAPTORS
 // Fixed capacity
 template <std::copyable T, size_t Capacity, class Alloc = std::allocator<T>>
 class FixedCircularBuffer
@@ -1515,4 +1685,4 @@ class SafeCircleBuffer
 public:
 	constexpr SafeCircleBuffer() = default;
 };
-#pragma endregion
+#endif
