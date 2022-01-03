@@ -24,6 +24,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "circular_buffer.h"
+
 #pragma endregion
 
 template <typename T>
@@ -74,7 +76,7 @@ private:
 		observer_ptr<self> next{nullptr};
 		observer_ptr<self> prev{nullptr};
 
-		size_t distance{0};
+		// size_t distance{0};
 #pragma endregion
 
 #pragma region Constructors && Destructor
@@ -100,14 +102,14 @@ private:
 			make_obj(std::forward<Args>(args)...);
 		}
 
-		constexpr Node(const Node& other) : next(other.next), prev(other.prev),
-											distance(other.distance)
+		constexpr Node(const Node& other) : next(other.next), prev(other.prev)
+		// , distance(other.distance)
 		{
 			make_obj(other.data);
 		}
 
-		constexpr Node(Node&& other) noexcept: next(other.next), prev(other.prev),
-											   distance(other.distance)
+		constexpr Node(Node&& other) noexcept: next(other.next), prev(other.prev)
+		// ,  distance(other.distance)
 
 		{
 			make_obj(std::exchange(other.data, nullptr));
@@ -122,7 +124,7 @@ private:
 			*data = *other.data;
 			next = other.next;
 			prev = other.prev;
-			distance = other.distance;
+			// distance = other.distance;
 
 			return *this;
 		}
@@ -132,7 +134,7 @@ private:
 			data = std::exchange(other.data, nullptr);
 			next = other.next;
 			prev = other.prev;
-			distance = other.distance;
+			// distance = other.distance;
 
 			return *this;
 		}
@@ -338,15 +340,15 @@ private:
 		linkNode(where, toInsert);
 
 
-		toInsert->distance = 1 + (where->prev)->distance;
-		auto iterator_ = toInsert->next;
+		// toInsert->distance = 1 + (where->prev)->distance;
+		// auto iterator_ = toInsert->next;
 
-		do
-		{
-			++iterator_->distance;
-			iterator_ = iterator_->next;
-		}
-		while (iterator_ != buffer_);
+		// do
+		// {
+		// 	++iterator_->distance;
+		// 	iterator_ = iterator_->next;
+		// }
+		// while (iterator_ != buffer_);
 
 		++capacity_;
 	}
@@ -372,14 +374,14 @@ private:
 	{
 		linkNodeAfter(where, toInsert);
 
-		toInsert->distance = 1 + where->distance;
-		auto iterator_ = toInsert->next;
-
-		while (iterator_ != buffer_)
-		{
-			++iterator_->distance;
-			iterator_ = iterator_->next;
-		}
+		// toInsert->distance = 1 + where->distance;
+		// auto iterator_ = toInsert->next;
+		//
+		// while (iterator_ != buffer_)
+		// {
+		// 	++iterator_->distance;
+		// 	iterator_ = iterator_->next;
+		// }
 
 		++capacity_;
 	}
@@ -424,6 +426,11 @@ private:
 	 */
 	void deleteNode(raw_ptr<Node> which)
 	{
+		if (which == buffer_)
+		{
+			buffer_ = buffer_->next; //TODO 
+		}
+
 		auto& preNode = which->prev;
 		auto& nextNode = which->next;
 
@@ -432,13 +439,15 @@ private:
 
 		destroyNode(which);
 
-		auto iterator_ = nextNode;
-		do
-		{
-			--(iterator_->distance);
-			iterator_ = iterator_->next;
-		}
-		while (iterator_ != buffer_);
+		--capacity_;
+
+		// auto iterator_ = nextNode;
+		// do
+		// {
+		// 	 --(iterator_->distance);
+		// 	iterator_ = iterator_->next;
+		// }
+		// while (iterator_ != buffer_);
 	}
 
 	void detachNode(raw_ptr<Node> e)
@@ -531,15 +540,15 @@ private:
 
 		// create nodes and link them
 		// update distance
-		size_t distance{0};
-		iterator_->distance = distance;
+		// size_t distance{0};
+		// iterator_->distance = distance;
 
 		for (size_t i = 0; i < capacityToInit - 1; ++i)
 		{
 			iterator_->next = make_node();
 			iterator_->next->prev = iterator_;
 			iterator_ = iterator_->next;
-			iterator_->distance = ++distance;
+			// iterator_->distance = ++distance;
 		}
 
 		// make it circular
@@ -654,6 +663,9 @@ private:
 
 public:
 #pragma region Iterators Defination
+
+	class iterator;
+	class circular_iterator;
 
 	/*
 	* @brief normal iterator
@@ -854,30 +866,39 @@ public:
 		{
 			assert(this->proxy_ == rhs.proxy_);
 
-			const auto iterator_ = this->ptr_;
-
-			if (iterator_ == nullptr)
-			[[unlikely]]
+			if (this->ptr_ == rhs.ptr_)
 			{
-				if (rhs.ptr_ == nullptr)
-				[[unlikely]]
+				return 0;
+			}
+
+
+			auto forward_iterator_1 = rhs.ptr_->next;
+			auto backward_iterator_2 = rhs.ptr_->prev;
+			difference_type res1{1};
+			difference_type res2{-1};
+			while (true)
+			{
+				if (forward_iterator_1 == this->ptr_)
 				{
-					return 0;
+					return res1;
 				}
 				else
 				{
-					return static_cast<difference_type>(proxy_->capacity()) - static_cast<difference_type>(rhs.ptr_->
-						distance);
+					forward_iterator_1 = forward_iterator_1->next;
+					++res1;
+				}
+
+
+				if (backward_iterator_2 == this->ptr_)
+				{
+					return res2;
+				}
+				else
+				{
+					backward_iterator_2 = backward_iterator_2->prev;
+					--res2;
 				}
 			}
-
-			if (rhs.ptr_ == nullptr)
-			[[unlikely]]
-			{
-				return iterator_->distance;
-			}
-
-			return static_cast<difference_type>(iterator_->distance) - static_cast<difference_type>(rhs.ptr_->distance);
 		}
 
 
@@ -929,6 +950,12 @@ public:
 			return ptr_->data <=> other.ptr_->data;
 		}
 
+
+		operator CircularBuffer::circular_iterator()
+		{
+			return circular_iterator(ptr_, proxy_);
+		}
+
 		constexpr virtual ~iterator() = default;
 	};
 
@@ -947,14 +974,15 @@ public:
 		using self = circular_iterator;
 		using const_pointer = const observer_ptr<T>;
 		using const_reference = const T&;
-		using container_ptr = CircularBuffer*;
-		using const_container_ptr = const CircularBuffer*;
+		using container_ptr = observer_ptr<CircularBuffer>;
+		using const_container_ptr = const observer_ptr<CircularBuffer>;
+
 
 	private:
 		observer_ptr<value_type> ptr_;
 		const_container_ptr proxy_;
 
-		auto clone(const iterator& other)
+		auto clone(const circular_iterator& other)
 		{
 			ptr_ = other.ptr_;
 			const_cast<container_ptr&>(proxy_) = other.proxy_;
@@ -967,21 +995,24 @@ public:
 		}
 
 	public:
+		friend class CircularBuffer;
+
+
 		constexpr circular_iterator() : ptr_(nullptr), proxy_(nullptr)
 		{
 		}
 
-		constexpr explicit
-		circular_iterator(observer_ptr<value_type> ptr, const_container_ptr proxy) : ptr_(ptr), proxy_(proxy)
+		constexpr circular_iterator(observer_ptr<value_type> ptr, container_ptr proxy) : ptr_(ptr), proxy_(proxy)
 		{
 		}
 
-		constexpr explicit circular_iterator(const circular_iterator& other) : ptr_(other.ptr_), proxy_(other.proxy_)
+		constexpr circular_iterator(const circular_iterator& other) : ptr_(other.ptr_),
+																	  proxy_(other.proxy_)
 		{
 		}
 
-		constexpr explicit circular_iterator(circular_iterator&& other) noexcept : ptr_(std::move(other.ptr_)),
-			proxy_(std::move(other.proxy_))
+		constexpr circular_iterator(circular_iterator&& other) noexcept : ptr_(std::move(other.ptr_)),
+																		  proxy_(std::move(other.proxy_))
 		{
 		}
 
@@ -1061,7 +1092,7 @@ public:
 			if (n == 0)
 			[[unlikely]]
 			{
-				return *this;
+				return circular_iterator(this->ptr_, this->proxy_);
 			}
 
 
@@ -1122,7 +1153,10 @@ public:
 
 			const auto iterator_ = this->ptr_;
 
-			return iterator_->distance - rhs.ptr_->distance;
+
+			// TODO
+
+			// return iterator_->distance - rhs.ptr_->distance;
 		}
 
 
@@ -1160,7 +1194,13 @@ public:
 			return this->ptr_->data <=> other.ptr_->data;
 		}
 
-		constexpr virtual ~circular_iterator() = default;
+		explicit operator CircularBuffer::iterator()
+		{
+			return CircularBuffer::iterator(ptr_, proxy_);
+		}
+
+
+		virtual constexpr ~circular_iterator() = default;
 	};
 
 	/**
@@ -1337,12 +1377,14 @@ public:
 			return;
 		}
 
-		raw_ptr<Node> mid = findNode((begin->distance + last->distance) / 2);
 
-
-		return mergeSortImpl(sort(begin, mid), mid->distance - begin->distance,
-							 sort(mid, last), last->distance - mid->distance,
-							 fn);
+		//TODO 
+		// raw_ptr<Node> mid = findNode((begin->distance + last->distance) / 2);
+		//
+		//
+		// return mergeSortImpl(sort(begin, mid), mid->distance - begin->distance,
+		// 					 sort(mid, last), last->distance - mid->distance,
+		// 					 fn);
 	}
 
 	/*
@@ -1394,7 +1436,7 @@ public:
 	constexpr auto reverse()
 	{
 		auto iterator_ = buffer_;
-		buffer_->distance = capacity_ - 1;
+		// buffer_->distance = capacity_ - 1;
 
 		//* exchange the next and prev pointer
 		for (size_t i = 0; i < capacity_; ++i)
@@ -1403,7 +1445,7 @@ public:
 			iterator_->prev = iterator_->next;
 			iterator_->next = temp;
 			iterator_ = iterator_->next;
-			iterator_->distance = i;
+			// iterator_->distance = i;
 		}
 
 		buffer_ = buffer_->next; // it's next 
@@ -1435,18 +1477,64 @@ public:
 		deleteNode(buffer_->prev);
 	}
 
-	constexpr auto erase(iterator begin, iterator end)
+	constexpr auto erase(const iterator& begin, const iterator& end)
 	{
 		assert(begin.proxy_ == end.proxy_);
-		auto it = begin + 1;
+		if (begin == end)
+		{
+			return begin;
+		}
 
+		auto res = end;
+		auto it = begin;
 		do
 		{
-			deleteNode(it.ptr_->prev); // not tested
+			auto ptr = it.ptr_;
+			++it;
+			deleteNode(ptr); // not tested
+		}
+		while (it != end);
+		return res;
+		// not Implement yet
+	}
+
+	constexpr auto erase(const iterator& which)
+	{
+		assert(which.proxy_ != this);
+
+		auto it = which + 1;
+		deleteNode(which);
+		return it;
+	}
+
+	constexpr auto erase(const circular_iterator& begin, const circular_iterator& end)
+	{
+		assert(begin.proxy_ == end.proxy_);
+		if (begin == end)
+		{
+			return begin;
+		}
+		auto res = end;
+		auto it = begin;
+		do
+		{
+			auto ptr = it.ptr_;
+			++it;
+			deleteNode(ptr); // not tested
 		}
 		while (it != end);
 
-		// not Implement yet
+		return res;
+	}
+
+
+	constexpr auto erase(const circular_iterator& which)
+	{
+		assert(which.proxy_ != this);
+
+		auto it = which + 1;
+		deleteNode(which);
+		return it;
 	}
 
 	constexpr auto erase_if()
@@ -1495,7 +1583,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////////////
 
 
-	[[nodiscard]] circular_iterator circular_begin() const
+	[[nodiscard]] circular_iterator circular_begin()
 	{
 		return circular_iterator(buffer_, this);
 	}

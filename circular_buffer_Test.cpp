@@ -5,6 +5,8 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <numeric>
+#include <random>
 #include <string>
 #include <vector>
 #include <fast_io/fast_io.h>
@@ -57,11 +59,35 @@ auto timer_ms(const std::function<void()> a)
 }
 
 
-int main(){
+int main()
+{
+	constexpr int step = 3;
+	constexpr int number = 10;
+	CircularBuffer<int> circle(number);
+
+	std::iota(circle.begin(), circle.end(), 1);
+
+	int res;
+	int i{1};
+	auto it = circle.circular_begin();
+	for (;;)
 	{
-		CircularBuffer<data> u(10);
-		auto i{0};
-		std::ranges::generate(u, [&i] { return ++i; });
-		println((*(std::begin(u) + 3)).x);
+		if (i == step)
+		{
+			i = 1;
+			it = circle.erase(it, it + 1);
+			if (circle.capacity() == 1)
+			{
+				res = *it;
+				break;
+			}
+		}
+		else
+		{
+			++i;
+			++it;
+		}
 	}
+
+	println(res);
 }

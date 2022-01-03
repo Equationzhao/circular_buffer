@@ -17,12 +17,12 @@
 ## Support Modifiers/Member access/Operators
 
 * insert/emplace
-* push (in process)
+* push
 * assign (in process)
 * write
 * read
 * at
-* operator []
+* operator [ ]
 * iterators :
   * iterator
   * const_iterator 
