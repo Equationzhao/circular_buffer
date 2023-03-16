@@ -1,5 +1,11 @@
 # Circular Buffer
 
+
+## [![Repography logo](https://images.repography.com/logo.svg)](https://repography.com) / Structure
+[![Structure](https://images.repography.com/35290882/Equationzhao/circular_buffer/structure/Kw0qpk2O0QP-Y_5yMrc8XljftmpB_-XngiK5JZV-uQ4/e9yxm9er02dfrnLCaEg7TMmNPTaEXOqv47cVuoKgB8s_table.svg)](https://github.com/Equationzhao/circular_buffer)
+
+
+
 ## This is a tiny c++ implementation of circular buffer (Circular linked list based).
 
 ## Features
