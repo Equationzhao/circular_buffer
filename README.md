@@ -44,6 +44,6 @@
 
 ## TODO LIST for now
 
-* [// ? compare the T data it contains or  test  are they actually the "same object"](https://github.com/Equationzhao/circle_buffer/blob/9159b6e2eca5607fd9063f3a8db61c05f09d8187/circular_buffer.h#L85) Design Problem?
+* [// ? compare the T data it contains or  test  if they are actually the "same object"](https://github.com/Equationzhao/circle_buffer/blob/9159b6e2eca5607fd9063f3a8db61c05f09d8187/circular_buffer.h#L85) Design Problem?
 * test Iterators 
 * Finish const_iterator / reversed_iterator (s)
